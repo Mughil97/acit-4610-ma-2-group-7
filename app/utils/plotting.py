@@ -47,27 +47,43 @@ def plot_run(history, title, out_path):
     return fig
 
 
-def animate_run(history, title, seconds_per_generation=0.05):
-    """Replay a run in a window, one generation at a time; the last generation stays open."""
-    all_f1 = [f1 for generation in history for f1, _ in generation]
-    all_f2 = [f2 for generation in history for _, f2 in generation]
-    fig, ax = plt.subplots(figsize=(8, 6))
-    ax.set_xlim(min(all_f1) * 0.95, max(all_f1) * 1.05)  # fixed axes, so the movement is visible
-    ax.set_ylim(min(all_f2) * 0.95, max(all_f2) * 1.05)
-    ax.set(xlabel="f1: opening cost", ylabel="f2: allocation cost")
-    ax.xaxis.set_major_formatter(WITH_COMMAS)
-    ax.yaxis.set_major_formatter(WITH_COMMAS)
-    ax.grid(alpha=0.25)
-    dots = ax.scatter([], [], alpha=0.6, label="population")
-    (line,) = ax.plot([], [], "o-", color="red", label="trade-offs")
-    ax.legend(loc="upper right")
+class LivePlot:
+    """A window that opens when a run starts and shows the population after every generation."""
 
-    for number, generation in enumerate(history):
-        if not plt.fignum_exists(fig.number):
-            return  # the window was closed
-        front = non_dominated(generation)
-        dots.set_offsets(generation)
-        line.set_data([f1 for f1, _ in front], [f2 for _, f2 in front])
-        ax.set_title(f"{title}\ngeneration {number} of {len(history) - 1}: {len(front)} trade-offs")
-        plt.pause(seconds_per_generation)
-    plt.show()
+    def __init__(self, title):
+        plt.ion()  # interactive mode: the window updates while the algorithm keeps running
+        self.title = title
+        self.fig, self.ax = plt.subplots(figsize=(8, 6))
+        self.ax.set(xlabel="f1: opening cost", ylabel="f2: allocation cost")
+        self.ax.xaxis.set_major_formatter(WITH_COMMAS)
+        self.ax.yaxis.set_major_formatter(WITH_COMMAS)
+        self.ax.grid(alpha=0.25)
+        self.dots = self.ax.scatter([], [], alpha=0.6, label="population")
+        (self.line,) = self.ax.plot([], [], "o-", color="red", label="trade-offs")
+        self.ax.legend(loc="upper right")
+        self.lowest = self.highest = None  # smallest and largest (f1, f2) seen so far
+
+    def update(self, number, objectives):
+        front = non_dominated(objectives)
+        self.dots.set_offsets(objectives)
+        self.line.set_data([f1 for f1, _ in front], [f2 for _, f2 in front])
+
+        # the axes only grow, so the start stays visible and the movement can be seen
+        f1s, f2s = [f1 for f1, _ in objectives], [f2 for _, f2 in objectives]
+        if self.lowest is None:
+            self.lowest, self.highest = [min(f1s), min(f2s)], [max(f1s), max(f2s)]
+        self.lowest = [min(self.lowest[0], min(f1s)), min(self.lowest[1], min(f2s))]
+        self.highest = [max(self.highest[0], max(f1s)), max(self.highest[1], max(f2s))]
+        self.ax.set_xlim(self.lowest[0] * 0.95, self.highest[0] * 1.05)
+        self.ax.set_ylim(self.lowest[1] * 0.95, self.highest[1] * 1.05)
+
+        self.ax.set_title(f"{self.title}\ngeneration {number}: {len(front)} trade-offs")
+        plt.pause(0.01)  # draw now
+
+    def keep_open(self):
+        plt.ioff()
+        plt.show()  # the last generation stays until the window is closed
+
+    def close(self):
+        plt.close(self.fig)
+        plt.ioff()

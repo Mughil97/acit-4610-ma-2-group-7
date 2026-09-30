@@ -18,12 +18,13 @@ class MOEA:
         self.rng = random.Random(seed)  # one generator for everything, so a seed repeats a run
         self.evaluations = 0
         self.history = []  # objectives of every generation
+        self.on_generation = None  # optional function(generation number, objectives), e.g. a live plot
 
     def run(self):
         """Evolve until the evaluation budget is used; return the final non-dominated (f1, f2) points."""
         population = [self.new_individual() for _ in range(self.config.pop_size)]
         objectives = self.evaluate_all(population)
-        self.history.append(objectives)
+        self.record(objectives)
 
         while self.evaluations < self.config.max_evaluations:
             mating_pool = self.select_parents(population, objectives)
@@ -32,9 +33,14 @@ class MOEA:
             population, objectives = self.environmental_selection(
                 population, objectives, offspring, offspring_objectives
             )
-            self.history.append(objectives)
+            self.record(objectives)
 
         return non_dominated(objectives)
+
+    def record(self, objectives):
+        self.history.append(objectives)
+        if self.on_generation:
+            self.on_generation(len(self.history) - 1, objectives)
 
     def new_individual(self):
         return repair(random_individual(self.instance, self.rng), self.instance, self.rng)
