@@ -4,6 +4,7 @@ and plot the first run of each combination to results/plots/ (shown on screen wh
 Examples:
     python run_experiments.py                                                    # everything, 10 runs each
     python run_experiments.py --algorithms vega --instances cap121 --configs C1 --runs 1
+    python run_experiments.py --instances cap121 --configs C3 --runs 1 --watch   # follow one run generation by generation
 
 Metrics (hypervolume) and statistical tests will be added here once app/utils has them.
 """
@@ -17,7 +18,8 @@ import matplotlib.pyplot as plt
 from app.algorithms import available_algorithms, create_algorithm
 from app.config import BASE_SEED, CONFIGS, INSTANCES, N_RUNS, RESULTS_DIR
 from app.problem.loader import load_by_name
-from app.utils.plotting import plot_run
+from app.utils.pareto import non_dominated
+from app.utils.plotting import animate_run, plot_run
 
 ALL_INSTANCES = [name for names in INSTANCES.values() for name in names]
 ALL_CONFIGS = [config.name for config in CONFIGS]
@@ -45,6 +47,20 @@ def run_once(algorithm, instance, config, seed, rows):
     return moea.history
 
 
+def print_generations(history, title, every=20):
+    """Print how a run progressed: one line every `every` generations, plus the last one."""
+    print(f"\n{title}")
+    print(f"{'generation':>10}  {'cheapest f1':>12}  {'cheapest f2':>12}  {'trade-offs':>10}  {'opening costs':>13}")
+    last = len(history) - 1
+    for number, generation in enumerate(history):
+        if number % every == 0 or number == last:
+            cheapest_f1 = min(f1 for f1, _ in generation)
+            cheapest_f2 = min(f2 for _, f2 in generation)
+            different_f1 = len({f1 for f1, _ in generation})
+            print(f"{number:>10}  {cheapest_f1:>12,.0f}  {cheapest_f2:>12,.0f}  "
+                  f"{len(non_dominated(generation)):>10}  {different_f1:>13}")
+
+
 def run_instance(algorithm, instance, configs, runs, rows, histories):
     """Every config and seed of one algorithm on one instance; stops at the first run that can not run."""
     for config in configs:
@@ -66,6 +82,8 @@ def main():
                         help="config names, e.g. C1 C2 C3 (default: all three)")
     parser.add_argument("--runs", type=int, default=N_RUNS,
                         help=f"independent runs (seeds) per combination (default: {N_RUNS})")
+    parser.add_argument("--watch", action="store_true",
+                        help="print each combination's first run generation by generation and replay it in a window")
     args = parser.parse_args()
 
     configs = [config for config in CONFIGS if config.name in args.configs]
@@ -89,12 +107,17 @@ def main():
     for (algorithm, instance_name, config_name), history in histories.items():
         title = f"{algorithm.upper()} on {instance_name}, {config_name} (seed {BASE_SEED})"
         figure = plot_run(history, title, plots_dir / f"{algorithm}_{instance_name}_{config_name}.png")
-        if len(histories) > MAX_WINDOWS:
+        if args.watch or len(histories) > MAX_WINDOWS:
             plt.close(figure)
     plural = "s" if len(histories) != 1 else ""
     print(f"saved {len(histories)} plot{plural} (the first run of each combination) to {plots_dir}")
 
-    if 0 < len(histories) <= MAX_WINDOWS:
+    if args.watch:
+        for (algorithm, instance_name, config_name), history in histories.items():
+            title = f"{algorithm.upper()} on {instance_name}, {config_name} (seed {BASE_SEED})"
+            print_generations(history, title)
+            animate_run(history, title)  # replays every generation in a window
+    elif 0 < len(histories) <= MAX_WINDOWS:
         plt.show()  # pop the plots open, like the lab
 
 

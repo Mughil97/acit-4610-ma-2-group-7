@@ -45,3 +45,29 @@ def plot_run(history, title, out_path):
     fig.tight_layout()
     fig.savefig(out_path, dpi=110)
     return fig
+
+
+def animate_run(history, title, seconds_per_generation=0.05):
+    """Replay a run in a window, one generation at a time; the last generation stays open."""
+    all_f1 = [f1 for generation in history for f1, _ in generation]
+    all_f2 = [f2 for generation in history for _, f2 in generation]
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.set_xlim(min(all_f1) * 0.95, max(all_f1) * 1.05)  # fixed axes, so the movement is visible
+    ax.set_ylim(min(all_f2) * 0.95, max(all_f2) * 1.05)
+    ax.set(xlabel="f1: opening cost", ylabel="f2: allocation cost")
+    ax.xaxis.set_major_formatter(WITH_COMMAS)
+    ax.yaxis.set_major_formatter(WITH_COMMAS)
+    ax.grid(alpha=0.25)
+    dots = ax.scatter([], [], alpha=0.6, label="population")
+    (line,) = ax.plot([], [], "o-", color="red", label="trade-offs")
+    ax.legend(loc="upper right")
+
+    for number, generation in enumerate(history):
+        if not plt.fignum_exists(fig.number):
+            return  # the window was closed
+        front = non_dominated(generation)
+        dots.set_offsets(generation)
+        line.set_data([f1 for f1, _ in front], [f2 for _, f2 in front])
+        ax.set_title(f"{title}\ngeneration {number} of {len(history) - 1}: {len(front)} trade-offs")
+        plt.pause(seconds_per_generation)
+    plt.show()
