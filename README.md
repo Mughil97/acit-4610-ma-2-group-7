@@ -46,6 +46,30 @@ The options:
 | `--instances` | any of `cap61 cap62 cap101 cap102 cap121 cap122` | all six |
 | `--configs` | any of `C1 C2 C3` (see the settings in 2.1) | all three |
 | `--runs` | independent runs per combination; run 1 uses seed 42, run 2 seed 43, ... | 10 |
+| `--watch` | follow the first run of each combination generation by generation (see below) | off |
+
+**Follow one run generation by generation:**
+
+```bash
+python run_experiments.py --instances cap121 --configs C3 --runs 1 --watch
+```
+
+The terminal shows how the run progresses, one line every 20 generations, and then a window replays the run,
+one generation at a time (the population as dots, the trade-offs as a red line):
+
+```text
+VEGA on cap121, C3 (seed 42)
+generation   cheapest f1   cheapest f2  trade-offs  opening costs
+         0       187,500     1,734,453           8             13
+        20       157,500     1,400,706           4             12
+       ...
+       140        67,500     1,113,356           2              4
+       ...
+       199        52,500     1,209,356           3              6
+```
+
+Here the cheapest f2 was 1,113,356 at generation 140 but 1,209,356 at the end: VEGA found a better solution and then
+lost it, because the children replace all the parents.
 
 **Run the entire thing** (VEGA on all six instances, C1 to C3, 10 seeds each: 180 runs, about a minute):
 
