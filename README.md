@@ -46,16 +46,17 @@ The options:
 | `--instances` | any of `cap61 cap62 cap101 cap102 cap121 cap122` | all six |
 | `--configs` | any of `C1 C2 C3` (see the settings in 2.1) | all three |
 | `--runs` | independent runs per combination; run 1 uses seed 42, run 2 seed 43, ... | 10 |
-| `--watch` | follow the first run of each combination generation by generation (see below) | off |
+| `--watch` | watch the first run of each combination live (see below) | off |
 
-**Follow one run generation by generation:**
+**Watch one run live:**
 
 ```bash
 python run_experiments.py --instances cap121 --configs C3 --runs 1 --watch
 ```
 
-The terminal shows how the run progresses, one line every 20 generations, and then a window replays the run,
-one generation at a time (the population as dots, the trade-offs as a red line):
+As soon as the run starts, a window opens and shows the population after every generation (dots) and its trade-offs
+(red line), while the terminal prints one line every 20 generations. When the run ends, the last generation stays on
+screen until you close the window.
 
 ```text
 VEGA on cap121, C3 (seed 42)
