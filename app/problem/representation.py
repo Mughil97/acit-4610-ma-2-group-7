@@ -1,18 +1,5 @@
-"""Chromosome encoding and population initialisation.
-
-Shared by both MOEAs so the comparison is fair.
-"""
-
-import numpy as np
-
-from app.problem.loader import CFLPInstance
+"""A solution is a list: individual[j] is the facility that serves customer j."""
 
 
-def random_individual(instance: CFLPInstance, rng: np.random.Generator) -> np.ndarray:
-    """Create one random chromosome."""
-    raise NotImplementedError
-
-
-def init_population(instance: CFLPInstance, pop_size: int, rng: np.random.Generator) -> list[np.ndarray]:
-    """Create the initial population."""
-    raise NotImplementedError
+def random_individual(instance, rng):
+    return [rng.randrange(instance.m) for _ in range(instance.n)]

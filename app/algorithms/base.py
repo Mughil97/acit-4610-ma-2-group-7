@@ -1,76 +1,62 @@
-"""Common MOEA skeleton (template method).
+"""The generational loop shared by both MOEAs; a subclass only chooses parents and survivors."""
 
-The generational loop, evaluation budget, variation and repair live here so
-every algorithm runs under identical conditions. Subclasses only decide how
-parents are chosen and how the next population is formed.
-"""
-
-from abc import ABC, abstractmethod
-
-import numpy as np
+import random
 
 from app.algorithms.operators import crossover, mutate
-from app.config import ExperimentConfig
 from app.problem.evaluation import evaluate
-from app.problem.loader import CFLPInstance
-from app.problem.repair import decode, repair
-from app.problem.representation import init_population
+from app.problem.repair import repair
+from app.problem.representation import random_individual
 from app.utils.pareto import non_dominated
 
-Population = list[np.ndarray]
 
+class MOEA:
+    name = "MOEA"
 
-class MOEA(ABC):
-    name: str
-
-    def __init__(self, instance: CFLPInstance, config: ExperimentConfig, seed: int):
+    def __init__(self, instance, config, seed):
         self.instance = instance
         self.config = config
-        self.rng = np.random.default_rng(seed)
+        self.rng = random.Random(seed)  # one generator for everything, so a seed repeats a run
         self.evaluations = 0
+        self.history = []  # objectives of every generation
 
-    def run(self) -> np.ndarray:
-        """Evolve until the evaluation budget is spent; return the final
-        non-dominated objective vectors, shape (k, 2)."""
-        population = [self._repair(c) for c in init_population(self.instance, self.config.pop_size, self.rng)]
-        objectives = self._evaluate(population)
+    def run(self):
+        """Evolve until the evaluation budget is used; return the final non-dominated (f1, f2) points."""
+        population = [self.new_individual() for _ in range(self.config.pop_size)]
+        objectives = self.evaluate_all(population)
+        self.history.append(objectives)
 
         while self.evaluations < self.config.max_evaluations:
-            parents = self.select_parents(population, objectives)
-            offspring = self._vary(population, parents)
-            offspring_objectives = self._evaluate(offspring)
+            mating_pool = self.select_parents(population, objectives)
+            offspring = self.reproduce(mating_pool)
+            offspring_objectives = self.evaluate_all(offspring)
             population, objectives = self.environmental_selection(
                 population, objectives, offspring, offspring_objectives
             )
+            self.history.append(objectives)
 
         return non_dominated(objectives)
 
-    @abstractmethod
-    def select_parents(self, population: Population, objectives: np.ndarray) -> np.ndarray:
-        """Return pop_size indices into population forming the mating pool."""
+    def new_individual(self):
+        return repair(random_individual(self.instance, self.rng), self.instance, self.rng)
 
-    @abstractmethod
-    def environmental_selection(
-        self,
-        population: Population,
-        objectives: np.ndarray,
-        offspring: Population,
-        offspring_objectives: np.ndarray,
-    ) -> tuple[Population, np.ndarray]:
-        """Return the next population and its objectives."""
+    def reproduce(self, mating_pool):
+        """Pair consecutive parents: crossover, mutation, repair."""
+        children = []
+        for k in range(0, len(mating_pool), 2):
+            child1, child2 = crossover(mating_pool[k], mating_pool[k + 1], self.config.crossover_prob, self.rng)
+            for child in (child1, child2):
+                child = mutate(child, self.config.mutation_prob, self.rng)
+                children.append(repair(child, self.instance, self.rng))
+        return children
 
-    def _vary(self, population: Population, parents: np.ndarray) -> Population:
-        """Pair consecutive parents, apply crossover and mutation, then repair."""
-        offspring = []
-        for a, b in zip(parents[::2], parents[1::2]):
-            c1, c2 = crossover(population[a], population[b], self.config.crossover_prob, self.rng)
-            offspring += [self._repair(mutate(c, self.config.mutation_prob, self.rng)) for c in (c1, c2)]
-        return offspring
-
-    def _repair(self, chromosome: np.ndarray) -> np.ndarray:
-        return repair(chromosome, self.instance, self.rng)
-
-    def _evaluate(self, population: Population) -> np.ndarray:
-        """Objective matrix of shape (len(population), 2); counts toward the budget."""
+    def evaluate_all(self, population):
         self.evaluations += len(population)
-        return np.array([evaluate(*decode(c, self.instance), self.instance) for c in population])
+        return [evaluate(individual, self.instance) for individual in population]
+
+    def select_parents(self, population, objectives):
+        """Return the mating pool: pop_size individuals."""
+        raise NotImplementedError
+
+    def environmental_selection(self, population, objectives, offspring, offspring_objectives):
+        """Return (next_population, next_objectives)."""
+        raise NotImplementedError
