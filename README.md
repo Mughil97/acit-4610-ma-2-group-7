@@ -40,7 +40,7 @@ The options:
 | Option | Meaning | Default |
 |---|---|---|
 | `--algorithms` | `vega` | `vega` |
-| `--instances` | any of `cap41 cap42 cap101 cap102 cap121 cap122` | all six |
+| `--instances` | any of `cap61 cap62 cap101 cap102 cap121 cap122` | all six |
 | `--configs` | any of `C1 C2 C3` (see the settings in 2.1) | all three |
 | `--runs` | independent runs per combination; run 1 uses seed 42, run 2 seed 43, ... | 10 |
 
@@ -52,7 +52,6 @@ python run_experiments.py --algorithms vega
 
 Every point of every final front is saved in `results/fronts.csv`
 (columns: algorithm, instance, config, seed, seconds, f1, f2). The same seed always gives the same result.
-cap41 and cap42 are skipped with a message (see 2.2.2).
 
 The notebook [experiment/vega.ipynb](experiment/vega.ipynb) builds VEGA cell by cell, with a small demo and plots
 after each step. To open it: `pip install ipykernel`, open the notebook in VS Code, choose the `.venv` kernel and
@@ -86,7 +85,7 @@ Every solution must follow three rules:
 3. a facility can not serve more demand than its **capacity**.
 
 The data comes unchanged from J. E. Beasley's [OR-Library](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/capinfo.html)
-(see [data/README.md](data/README.md)): cap41 and cap42 (16 facilities), cap101 and cap102 (25), cap121 and cap122 (50),
+(see [data/README.md](data/README.md)): cap61 and cap62 (16 facilities), cap101 and cap102 (25), cap121 and cap122 (50),
 each with 50 customers.
 
 **The tiny example used below:** 3 facilities (0, 1, 2), each with capacity 100, and 4 customers (0, 1, 2, 3):
@@ -303,11 +302,13 @@ return the non-dominated scores
 
 #### 2.2.2 VEGA Result
 
-One run per configuration with seed 42, on one medium and one large instance
-(the small instances can not be solved, see below):
+One run per configuration with seed 42, on one small, one medium and one large instance:
 
 | Instance | Config | Trade-offs found | Pareto front (f1, f2) | Time |
 |---|---|---|---|---|
+| cap61 | C1 | 3 | (52,500, 1,402,757), (60,000, 1,351,098), (67,500, 1,331,653) | 0.14 s |
+| cap61 | C2 | 2 | (52,500, 1,327,786), (60,000, 1,201,305) | 0.25 s |
+| cap61 | C3 | 3 | (45,000, 1,265,071), (52,500, 1,250,551), (60,000, 1,217,828) | 0.49 s |
 | cap101 | C1 | 1 | (30,000, 1,153,560) | 0.17 s |
 | cap101 | C2 | 1 | (37,500, 1,100,450) | 0.29 s |
 | cap101 | C3 | 1 | (45,000, 1,144,740) | 0.59 s |
@@ -319,9 +320,10 @@ Every solution VEGA scored follows all three rules, and running the same seed ag
 The table shows seed 42 only. `python run_experiments.py --algorithms vega` runs all 10 seeds and saves every front
 in `results/fronts.csv`. The hypervolume metric is not written yet.
 
-**Small instances:** in cap41 and cap42 every facility holds 5,000, but two customers need more than that
-(12,912 and 5,495). With exactly one facility per customer, they can not be placed anywhere, so the code stops with
-a clear message. The group still has to ask the lecturer how to handle these two instances.
+**Small instances:** the assignment lists cap41 and cap42, but there every facility holds 5,000 while two customers
+need more than that (12,912 and 5,495). With exactly one facility per customer they can not be placed anywhere, so
+the group uses cap61 and cap62 instead: the same customers and costs, with 15,000 per facility.
+If cap41 or cap42 is loaded, the code stops with a clear message.
 
 #### 2.2.3 VEGA Verdict
 
