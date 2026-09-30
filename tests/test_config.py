@@ -7,7 +7,7 @@ class ConfigTest(unittest.TestCase):
     def test_required_instances(self):
         self.assertEqual(
             INSTANCES,
-            {"small": ["cap41", "cap42"], "medium": ["cap101", "cap102"], "large": ["cap121", "cap122"]},
+            {"small": ["cap61", "cap62"], "medium": ["cap101", "cap102"], "large": ["cap121", "cap122"]},
         )
 
     def test_three_uniquely_named_configs(self):
