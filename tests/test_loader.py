@@ -34,7 +34,8 @@ class LoadInstanceTest(unittest.TestCase):
     def test_parses_all_fields(self):
         inst = load_instance(self._write(TINY))
         self.assertEqual(inst.name, "tiny")
-        self.assertEqual((inst.m, inst.n), (3, 2))
+        self.assertEqual(inst.m, 3)
+        self.assertEqual(inst.n, 2)
         np.testing.assert_array_equal(inst.capacity, [100, 200, 300])
         np.testing.assert_array_equal(inst.fixed_cost, [10, 20, 0])
         np.testing.assert_array_equal(inst.demand, [5, 7])
@@ -72,8 +73,10 @@ class RequiredInstancesTest(unittest.TestCase):
             for name in names:
                 with self.subTest(name=name):
                     inst = load_by_name(name)
-                    self.assertEqual((inst.m, inst.n), self.SIZES[category])
-                    self.assertEqual(inst.alloc_cost.shape, (inst.m, inst.n))
+                    m, n = self.SIZES[category]
+                    self.assertEqual(inst.m, m)
+                    self.assertEqual(inst.n, n)
+                    self.assertEqual(inst.alloc_cost.shape, (m, n))
 
     def test_total_capacity_covers_demand(self):
         for names in INSTANCES.values():
