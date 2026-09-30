@@ -39,8 +39,9 @@ class BaseLoopTest(unittest.TestCase):
             self.addCleanup(p.stop)
 
     def test_moea_is_abstract(self):
+        instance, config = tiny_instance(), tiny_config()
         with self.assertRaises(TypeError):
-            MOEA(tiny_instance(), tiny_config(), seed=1)
+            MOEA(instance, config, seed=1)
 
     def test_stops_once_budget_is_spent(self):
         # 4 initial + 4 per generation: 4 -> 8 -> 12, which is the first count >= 10.
