@@ -1,10 +1,9 @@
-"""Entry point: run the MOEAs on every instance, config and seed, save the final fronts to results/fronts.csv,
-and plot the first run of each combination to results/plots/ (shown on screen when there are 3 or fewer).
+"""Entry point: run the MOEAs on every instance, config and seed, play the first run of each combination in a
+window, save the final fronts to results/fronts.csv and a picture of each first run to results/plots/.
 
 Examples:
     python run_experiments.py                                                    # everything, 10 runs each
-    python run_experiments.py --algorithms vega --instances cap121 --configs C1 --runs 1
-    python run_experiments.py --instances cap121 --configs C3 --runs 1 --watch   # watch one run live
+    python run_experiments.py --instances cap121 --configs C3 --runs 1           # one run
 
 Metrics (hypervolume) and statistical tests will be added here once app/utils has them.
 """
@@ -19,12 +18,11 @@ from app.algorithms import available_algorithms, create_algorithm
 from app.config import BASE_SEED, CONFIGS, INSTANCES, N_RUNS, RESULTS_DIR
 from app.problem.loader import load_by_name
 from app.utils.pareto import non_dominated
-from app.utils.plotting import LivePlot, plot_run
+from app.utils.plotting import animate_run, plot_run
 
 ALL_INSTANCES = [name for names in INSTANCES.values() for name in names]
 ALL_CONFIGS = [config.name for config in CONFIGS]
-MAX_WINDOWS = 3  # more plots than this are only saved, not opened
-PRINT_EVERY = 20  # with --watch, one terminal line every 20 generations
+PRINT_EVERY = 20  # one terminal line every 20 generations while a run plays
 PROGRESS_HEADER = f"{'generation':>10}  {'cheapest f1':>12}  {'cheapest f2':>12}  {'trade-offs':>10}  {'opening costs':>13}"
 
 
@@ -37,60 +35,75 @@ def progress_line(number, objectives):
             f"{len(non_dominated(objectives)):>10}  {opening_costs:>13}")
 
 
-def watch_live(moea, title):
-    """Open a live window and print a terminal line every PRINT_EVERY generations while moea runs."""
-    live = LivePlot(title)
+def watch_run(history, title, close_when_done):
+    """Play the run in a window, with a terminal line every PRINT_EVERY generations in step with it."""
+    last = len(history) - 1
     print(f"\n{title}\n{PROGRESS_HEADER}")
 
-    def on_generation(number, objectives):
-        live.update(number, objectives)
-        if number % PRINT_EVERY == 0:
+    def on_frame(number, objectives):
+        if number % PRINT_EVERY == 0 or number == last:
             print(progress_line(number, objectives), flush=True)
 
-    moea.on_generation = on_generation
-    return live
+    animate_run(history, title, on_frame, close_when_done)  # returns when the window is closed
 
 
-def run_once(algorithm, instance, config, seed, rows, watch=False):
+def save_checkpoint(rows, algorithm, instance_name, config_name, history):
+    """Save the picture of this combination's first run and every front point so far; print what was saved."""
+    plots_dir = RESULTS_DIR / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    picture = plots_dir / f"{algorithm}_{instance_name}_{config_name}.png"
+    title = f"{algorithm.upper()} on {instance_name}, {config_name} (seed {BASE_SEED})"
+    plt.close(plot_run(history, title, picture))
+
+    fronts = RESULTS_DIR / "fronts.csv"
+    with open(fronts, "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["algorithm", "instance", "config", "seed", "seconds", "f1", "f2"])
+        writer.writerows(rows)
+
+    print(f"checkpoint: saved results/plots/{picture.name} and {len(rows)} front points so far to results/fronts.csv",
+          flush=True)
+
+
+def run_once(algorithm, instance, config, seed, rows, watch=False, close_window=False):
     """Run once, print one line and add the front to rows; return the run's history, or None if it can not run."""
     start = time.perf_counter()
     moea = create_algorithm(algorithm, instance, config, seed)
-    live = watch_live(moea, f"{algorithm.upper()} on {instance.name}, {config.name} (seed {seed})") if watch else None
     try:
         front = moea.run()
     except NotImplementedError:
         print(f"{algorithm} {instance.name}: skipped, {algorithm} is not implemented yet")
-        if live:
-            live.close()
         return None
     except ValueError as error:  # e.g. cap41/cap42 can not be solved
         print(f"{algorithm}: skipped, {error}")
-        if live:
-            live.close()
         return None
     seconds = time.perf_counter() - start
 
-    if live and (len(moea.history) - 1) % PRINT_EVERY != 0:
-        print(progress_line(len(moea.history) - 1, moea.history[-1]))  # the last generation
     print(f"{algorithm:<6} {instance.name:<7} {config.name}  seed {seed}:  {len(front)} trade-offs,"
           f"  best f1 {front[0][0]:>9,.0f},  best f2 {front[-1][1]:>12,.0f},  {seconds:.2f} s")
     for f1, f2 in front:
         rows.append([algorithm, instance.name, config.name, seed, round(seconds, 3), f1, f2])
-    if live:
-        live.keep_open()  # the window stays until you close it, then the next run starts
+    if watch:
+        title = f"{algorithm.upper()} on {instance.name}, {config.name} (seed {seed})"
+        watch_run(moea.history, title, close_window)
     return moea.history
 
 
-def run_instance(algorithm, instance, configs, runs, rows, histories, watch):
-    """Every config and seed of one algorithm on one instance; stops at the first run that can not run."""
+def run_instance(algorithm, instance, configs, runs, rows, close_windows):
+    """Every config and seed of one algorithm on one instance, with a checkpoint after each config."""
     for config in configs:
+        print(f"{instance.name}, {config.name}: {runs} runs "
+              f"(population {config.pop_size}, {config.max_evaluations:,} evaluations each)", flush=True)
+        first_history = None
         for run in range(runs):
             seed = BASE_SEED + run  # run 1 uses seed 42, run 2 uses seed 43, ...
-            history = run_once(algorithm, instance, config, seed, rows, watch=watch and run == 0)
+            history = run_once(algorithm, instance, config, seed, rows, run == 0, close_windows)  # play the first
             if history is None:
                 return
             if run == 0:
-                histories[(algorithm, instance.name, config.name)] = history
+                first_history = history
+        if first_history:
+            save_checkpoint(rows, algorithm, instance.name, config.name, first_history)
 
 
 def main():
@@ -103,39 +116,20 @@ def main():
                         help="config names, e.g. C1 C2 C3 (default: all three)")
     parser.add_argument("--runs", type=int, default=N_RUNS,
                         help=f"independent runs (seeds) per combination (default: {N_RUNS})")
-    parser.add_argument("--watch", action="store_true",
-                        help="watch the first run of each combination live: a window updated every generation "
-                             f"and a terminal line every {PRINT_EVERY} generations")
     args = parser.parse_args()
 
     configs = [config for config in CONFIGS if config.name in args.configs]
     rows = []  # one row per point of every final front
-    histories = {}  # {(algorithm, instance, config): history of the first run}
+    # several combinations: each window closes by itself, so the next one can start
+    close_windows = len(args.algorithms) * len(args.instances) * len(configs) > 1
 
     for algorithm in args.algorithms:
         for instance_name in args.instances:
-            run_instance(algorithm, load_by_name(instance_name), configs, args.runs, rows, histories, args.watch)
+            instance = load_by_name(instance_name)
+            print(f"\nloading {instance_name}: {instance.m} facilities, {instance.n} customers", flush=True)
+            run_instance(algorithm, instance, configs, args.runs, rows, close_windows)
 
-    RESULTS_DIR.mkdir(exist_ok=True)
-    out_path = RESULTS_DIR / "fronts.csv"
-    with open(out_path, "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["algorithm", "instance", "config", "seed", "seconds", "f1", "f2"])
-        writer.writerows(rows)
-    print(f"\nsaved {len(rows)} front points to {out_path}")
-
-    plots_dir = RESULTS_DIR / "plots"
-    plots_dir.mkdir(exist_ok=True)
-    for (algorithm, instance_name, config_name), history in histories.items():
-        title = f"{algorithm.upper()} on {instance_name}, {config_name} (seed {BASE_SEED})"
-        figure = plot_run(history, title, plots_dir / f"{algorithm}_{instance_name}_{config_name}.png")
-        if args.watch or len(histories) > MAX_WINDOWS:
-            plt.close(figure)
-    plural = "s" if len(histories) != 1 else ""
-    print(f"saved {len(histories)} plot{plural} (the first run of each combination) to {plots_dir}")
-
-    if not args.watch and 0 < len(histories) <= MAX_WINDOWS:
-        plt.show()  # pop the plots open, like the lab
+    print(f"done: {len(rows)} front points in results/fronts.csv, pictures in results/plots/")
 
 
 if __name__ == "__main__":

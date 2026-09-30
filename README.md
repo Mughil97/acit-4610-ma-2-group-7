@@ -21,74 +21,30 @@ pip install -r requirements.txt    # only matplotlib, for plots
 
 ### 1.2 How to run VEGA
 
-One run of VEGA on cap121 with configuration C1:
-
-```bash
-python run_experiments.py --algorithms vega --instances cap121 --configs C1 --runs 1
-```
-
-Expected output:
-
-```text
-vega   cap121  C1  seed 42:  2 trade-offs,  best f1    52,500,  best f2    1,380,867,  0.24 s
-
-saved 2 front points to .../results/fronts.csv
-saved 1 plot (the first run of each combination) to .../results/plots
-```
-
-A window with the plot of the run opens at the end, like in the lab (see 2.2.2 for how to read it).
-
-The options:
-
-| Option | Meaning | Default |
-|---|---|---|
-| `--algorithms` | `vega` | `vega` |
-| `--instances` | any of `cap61 cap62 cap101 cap102 cap121 cap122` | all six |
-| `--configs` | any of `C1 C2 C3` (see the settings in 2.1) | all three |
-| `--runs` | independent runs per combination; run 1 uses seed 42, run 2 seed 43, ... | 10 |
-| `--watch` | watch the first run of each combination live (see below) | off |
-
-**Watch one run live:**
-
-```bash
-python run_experiments.py --instances cap121 --configs C3 --runs 1 --watch
-```
-
-As soon as the run starts, a window opens and shows the population after every generation (dots) and its trade-offs
-(red line), while the terminal prints one line every 20 generations. When the run ends, the last generation stays on
-screen until you close the window.
-
-```text
-VEGA on cap121, C3 (seed 42)
-generation   cheapest f1   cheapest f2  trade-offs  opening costs
-         0       187,500     1,734,453           8             13
-        20       157,500     1,400,706           4             12
-       ...
-       140        67,500     1,113,356           2              4
-       ...
-       199        52,500     1,209,356           3              6
-```
-
-Here the cheapest f2 was 1,113,356 at generation 140 but 1,209,356 at the end: VEGA found a better solution and then
-lost it, because the children replace all the parents.
-
-**Run the entire thing** (VEGA on all six instances, C1 to C3, 10 seeds each: 180 runs, about a minute):
+**Run the entire thing** (VEGA on all six instances, C1 to C3, 10 seeds each: 180 runs, a few minutes):
 
 ```bash
 python run_experiments.py
 ```
 
-It saves:
+One run of VEGA on cap121 with configuration C3:
+
+```bash
+python run_experiments.py --instances cap121 --configs C3 --runs 1
+```
+
+The options:
+
+| Option         | Meaning                                                                  | Default   |
+| -------------- | ------------------------------------------------------------------------ | --------- |
+| `--algorithms` | `vega`                                                                   | `vega`    |
+| `--instances`  | any of `cap61 cap62 cap101 cap102 cap121 cap122`                         | all six   |
+| `--configs`    | any of `C1 C2 C3` (see the settings in 2.1)                              | all three |
+| `--runs`       | independent runs per combination; run 1 uses seed 42, run 2 seed 43, ... | 10        |
 
 - `results/fronts.csv`: every point of every final front (columns: algorithm, instance, config, seed, seconds, f1, f2);
-- `results/plots/`: one picture per instance and config, of its first run (seed 42), e.g. `vega_cap121_C3.png`.
-
-Windows only open when a run makes 3 plots or fewer; otherwise open the pictures in `results/plots/`.
-The same seed always gives the same result.
-
-The notebook [experiment/vega.ipynb](experiment/vega.ipynb) builds VEGA cell by cell, with a small demo and plots
-after each step. To open it: `pip install ipykernel`, open the notebook in VS Code, choose the `.venv` kernel and
-click **Run All**.
+- `results/plots/`: one picture per instance and config, of its first run (seed 42), e.g. `vega_cap121_C3.png`
+  (see 2.2.2 for how to read it).
 
 ---
 
@@ -123,12 +79,12 @@ each with 50 customers.
 
 **The tiny example used below:** 3 facilities (0, 1, 2), each with capacity 100, and 4 customers (0, 1, 2, 3):
 
-| | Customer 0 | Customer 1 | Customer 2 | Customer 3 | Fixed cost |
-|---|---|---|---|---|---|
-| **Demand** | 60 | 50 | 40 | 30 | |
-| Serving cost from facility 0 | 10 | 20 | 30 | 40 | 100 |
-| Serving cost from facility 1 | 30 | 10 | 20 | 30 | 80 |
-| Serving cost from facility 2 | 40 | 30 | 10 | 10 | 120 |
+|                              | Customer 0 | Customer 1 | Customer 2 | Customer 3 | Fixed cost |
+| ---------------------------- | ---------- | ---------- | ---------- | ---------- | ---------- |
+| **Demand**                   | 60         | 50         | 40         | 30         |            |
+| Serving cost from facility 0 | 10         | 20         | 30         | 40         | 100        |
+| Serving cost from facility 1 | 30         | 10         | 20         | 30         | 80         |
+| Serving cost from facility 2 | 40         | 30         | 10         | 10         | 120        |
 
 #### The big idea: evolution
 
@@ -188,10 +144,10 @@ Scores are only calculated **after** repair. Each scored solution counts as one 
 
 Solution A **dominates** B when A is **not worse in any score** and **strictly better in at least one**.
 
-| Solution | f1 | f2 | |
-|---|---|---|---|
-| P = `[0, 1, 1, 0]` | 180 | 80 | 2 facilities open |
-| Q = `[0, 1, 2, 2]` | 300 | 40 | 3 facilities open |
+| Solution           | f1  | f2  |                   |
+| ------------------ | --- | --- | ----------------- |
+| P = `[0, 1, 1, 0]` | 180 | 80  | 2 facilities open |
+| Q = `[0, 1, 2, 2]` | 300 | 40  | 3 facilities open |
 | R = `[0, 2, 0, 1]` | 300 | 100 | 3 facilities open |
 
 Q dominates R (same f1, lower f2). P and Q are different trade-offs: neither dominates the other.
@@ -241,24 +197,24 @@ The result is the Pareto front of the last generation, without duplicates, sorte
 The settings live in [app/config.py](app/config.py):
 
 | Config | Population N | Evaluations | Crossover p_c | Mutation p_m |
-|---|---|---|---|---|
-| C1 | 50 | 10,000 | 0.9 | 0.05 |
-| C2 | 100 | 20,000 | 0.9 | 0.02 |
-| C3 | 200 | 40,000 | 0.8 | 0.01 |
+| ------ | ------------ | ----------- | ------------- | ------------ |
+| C1     | 50           | 10,000      | 0.9           | 0.05         |
+| C2     | 100          | 20,000      | 0.9           | 0.02         |
+| C3     | 200          | 40,000      | 0.8           | 0.01         |
 
 Every random choice uses one random generator started from a **seed** (42), so the same seed always repeats a run
 exactly. The assignment asks for 10 runs (10 seeds) per instance and configuration.
 
 #### Where each part is in the code
 
-| Part | File | Function |
-|---|---|---|
-| A. how a solution is stored | [app/problem/representation.py](app/problem/representation.py) | `random_individual` |
-| B. repair | [app/problem/repair.py](app/problem/repair.py) | `repair` |
-| C. scoring | [app/problem/evaluation.py](app/problem/evaluation.py) | `evaluate` |
-| D. dominance, Pareto front | [app/utils/pareto.py](app/utils/pareto.py) | `dominates`, `non_dominated` |
-| E. crossover, mutation | [app/algorithms/operators.py](app/algorithms/operators.py) | `crossover`, `mutate` |
-| F. the loop and the result | [app/algorithms/base.py](app/algorithms/base.py) | `MOEA.run` |
+| Part                        | File                                                           | Function                     |
+| --------------------------- | -------------------------------------------------------------- | ---------------------------- |
+| A. how a solution is stored | [app/problem/representation.py](app/problem/representation.py) | `random_individual`          |
+| B. repair                   | [app/problem/repair.py](app/problem/repair.py)                 | `repair`                     |
+| C. scoring                  | [app/problem/evaluation.py](app/problem/evaluation.py)         | `evaluate`                   |
+| D. dominance, Pareto front  | [app/utils/pareto.py](app/utils/pareto.py)                     | `dominates`, `non_dominated` |
+| E. crossover, mutation      | [app/algorithms/operators.py](app/algorithms/operators.py)     | `crossover`, `mutate`        |
+| F. the loop and the result  | [app/algorithms/base.py](app/algorithms/base.py)               | `MOEA.run`                   |
 
 ### 2.2 VEGA
 
@@ -306,10 +262,6 @@ pie title Chance of being picked (costs 100, 120, 150, 200)
 The cost-200 solution has slice 0, so it is never picked. To **spin**, draw a random number between 0 and the total
 of all slices (230 here) and see whose slice it lands in. Spin once for every parent needed.
 
-> **Why not the lab's formula?** Lab 3 uses slice = 1 / (1 + cost). That works for its costs between 0 and 16,
-> but CFLP costs are around a million. For costs 1.0M, 1.1M and 1.2M it gives chances of 36.5%, 33.1% and 30.4%,
-> which is almost random. `worst - cost` gives 66.7%, 33.3% and 0%.
-
 **Who survives.** VEGA uses **generational replacement**: the N children replace **all** N parents.
 
 **The whole of VEGA in pseudo-code:**
@@ -337,17 +289,17 @@ return the non-dominated scores
 
 One run per configuration with seed 42, on one small, one medium and one large instance:
 
-| Instance | Config | Trade-offs found | Pareto front (f1, f2) | Time |
-|---|---|---|---|---|
-| cap61 | C1 | 3 | (52,500, 1,402,757), (60,000, 1,351,098), (67,500, 1,331,653) | 0.14 s |
-| cap61 | C2 | 2 | (52,500, 1,327,786), (60,000, 1,201,305) | 0.25 s |
-| cap61 | C3 | 3 | (45,000, 1,265,071), (52,500, 1,250,551), (60,000, 1,217,828) | 0.49 s |
-| cap101 | C1 | 1 | (30,000, 1,153,560) | 0.17 s |
-| cap101 | C2 | 1 | (37,500, 1,100,450) | 0.29 s |
-| cap101 | C3 | 1 | (45,000, 1,144,740) | 0.59 s |
-| cap121 | C1 | 2 | (52,500, 1,469,533), (67,500, 1,380,867) | 0.24 s |
-| cap121 | C2 | 2 | (52,500, 1,555,781), (60,000, 1,262,842) | 0.44 s |
-| cap121 | C3 | 3 | (52,500, 1,225,511), (60,000, 1,212,651), (67,500, 1,209,356) | 0.87 s |
+| Instance | Config | Trade-offs found | Pareto front (f1, f2)                                         | Time   |
+| -------- | ------ | ---------------- | ------------------------------------------------------------- | ------ |
+| cap61    | C1     | 3                | (52,500, 1,402,757), (60,000, 1,351,098), (67,500, 1,331,653) | 0.14 s |
+| cap61    | C2     | 2                | (52,500, 1,327,786), (60,000, 1,201,305)                      | 0.25 s |
+| cap61    | C3     | 3                | (45,000, 1,265,071), (52,500, 1,250,551), (60,000, 1,217,828) | 0.49 s |
+| cap101   | C1     | 1                | (30,000, 1,153,560)                                           | 0.17 s |
+| cap101   | C2     | 1                | (37,500, 1,100,450)                                           | 0.29 s |
+| cap101   | C3     | 1                | (45,000, 1,144,740)                                           | 0.59 s |
+| cap121   | C1     | 2                | (52,500, 1,469,533), (67,500, 1,380,867)                      | 0.24 s |
+| cap121   | C2     | 2                | (52,500, 1,555,781), (60,000, 1,262,842)                      | 0.44 s |
+| cap121   | C3     | 3                | (52,500, 1,225,511), (60,000, 1,212,651), (67,500, 1,209,356) | 0.87 s |
 
 Every solution VEGA scored follows all three rules, and running the same seed again gives exactly the same numbers.
 The table shows seed 42 only. `python run_experiments.py` runs all 10 seeds and saves every front
@@ -390,8 +342,4 @@ If cap41 or cap42 is loaded, the code stops with a clear message.
 roughly doubled with each step. On cap101 there was no clear improvement. The 10-seed runs will show whether these
 differences are real.
 
-
-
 ---
-
-
