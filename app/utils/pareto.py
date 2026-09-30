@@ -1,13 +1,12 @@
-"""Pareto dominance helpers (minimisation), shared by the MOEAs and the metrics."""
-
-import numpy as np
+"""Pareto dominance, both objectives minimised."""
 
 
-def dominates(a: np.ndarray, b: np.ndarray) -> bool:
-    """True if objective vector a Pareto-dominates b."""
-    raise NotImplementedError
+def dominates(a, b):
+    """a is not worse in any objective and strictly better in at least one."""
+    return all(x <= y for x, y in zip(a, b)) and any(x < y for x, y in zip(a, b))
 
 
-def non_dominated(objectives: np.ndarray) -> np.ndarray:
-    """Filter to the non-dominated objective vectors."""
-    raise NotImplementedError
+def non_dominated(objectives):
+    """The unique points no other point dominates, sorted by f1."""
+    unique = sorted({tuple(point) for point in objectives})
+    return [point for point in unique if not any(dominates(other, point) for other in unique)]

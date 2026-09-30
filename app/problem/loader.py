@@ -1,18 +1,10 @@
-"""Parse OR-Library capacitated warehouse location files (cap41, cap101, ...).
+"""Read an OR-Library capacitated warehouse file (cap41, cap101, cap121, ...), values unchanged.
 
-Source: https://people.brunel.ac.uk/~mastjjb/jeb/orlib/capinfo.html
-
-File layout (whitespace separated; a customer's cost list wraps over several lines):
-    m n
-    for each facility i:  capacity S_i   fixed_cost F_i
-    for each customer j:  demand d_j
-                          m allocation costs C_ij (cost of serving ALL of j's demand from i)
+File layout: "m n", then m lines "capacity fixed_cost", then per customer its demand and m allocation costs.
 """
 
 from dataclasses import dataclass
 from pathlib import Path
-
-import numpy as np
 
 from app.config import DATA_DIR
 
@@ -20,48 +12,52 @@ from app.config import DATA_DIR
 @dataclass(frozen=True)
 class CFLPInstance:
     name: str
-    capacity: np.ndarray    # S_i, shape (m,)
-    fixed_cost: np.ndarray  # F_i, shape (m,)
-    demand: np.ndarray      # d_j, shape (n,)
-    alloc_cost: np.ndarray  # C_ij, shape (m, n)
-
-    def __post_init__(self):
-        # OR-Library values must be used unchanged, so accidental writes should fail loudly.
-        for arr in (self.capacity, self.fixed_cost, self.demand, self.alloc_cost):
-            arr.setflags(write=False)
+    capacity: tuple    # capacity[i], S_i
+    fixed_cost: tuple  # fixed_cost[i], F_i
+    demand: tuple      # demand[j], d_j
+    alloc_cost: tuple  # alloc_cost[i][j], C_ij: serving all of customer j from facility i
 
     @property
-    def m(self) -> int:
+    def m(self):
         return len(self.capacity)
 
     @property
-    def n(self) -> int:
+    def n(self):
         return len(self.demand)
 
 
-def load_instance(path: Path) -> CFLPInstance:
-    """Read one OR-Library file into a CFLPInstance, using its values unchanged."""
-    path = Path(path)
-    tokens = path.read_text().split()
-    m, n = int(tokens[0]), int(tokens[1])
+def load_instance(path):
+    numbers = Path(path).read_text().split()
+    m, n = int(numbers[0]), int(numbers[1])
 
     expected = 2 + 2 * m + n * (1 + m)
-    if len(tokens) != expected:
-        raise ValueError(f"{path.name}: expected {expected} values for m={m}, n={n}, found {len(tokens)}")
+    if len(numbers) != expected:
+        raise ValueError(f"{Path(path).name}: expected {expected} numbers for m={m}, n={n}, found {len(numbers)}")
 
-    values = np.array(tokens[2:], dtype=float)
-    facilities = values[: 2 * m].reshape(m, 2)
-    customers = values[2 * m :].reshape(n, 1 + m)
+    position = 2
+    capacity, fixed_cost = [], []
+    for _ in range(m):
+        capacity.append(float(numbers[position]))
+        fixed_cost.append(float(numbers[position + 1]))
+        position += 2
 
-    return CFLPInstance(
-        name=path.stem,
-        capacity=facilities[:, 0].copy(),
-        fixed_cost=facilities[:, 1].copy(),
-        demand=customers[:, 0].copy(),
-        alloc_cost=customers[:, 1:].T.copy(),  # file is per customer; store per facility
+    demand = []
+    alloc_cost = [[0.0] * n for _ in range(m)]  # the file is per customer, we store per facility
+    for j in range(n):
+        demand.append(float(numbers[position]))
+        position += 1
+        for i in range(m):
+            alloc_cost[i][j] = float(numbers[position])
+            position += 1
+
+    return CFLPInstance(  # tuples, so the data can not be changed by accident
+        name=Path(path).stem,
+        capacity=tuple(capacity),
+        fixed_cost=tuple(fixed_cost),
+        demand=tuple(demand),
+        alloc_cost=tuple(tuple(row) for row in alloc_cost),
     )
 
 
-def load_by_name(name: str, data_dir: Path = DATA_DIR) -> CFLPInstance:
-    """Load e.g. "cap41" from data/cap41.txt."""
-    return load_instance(data_dir / f"{name}.txt")
+def load_by_name(name, data_dir=DATA_DIR):
+    return load_instance(Path(data_dir) / f"{name}.txt")

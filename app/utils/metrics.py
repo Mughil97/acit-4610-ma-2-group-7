@@ -3,14 +3,12 @@
 Both MOEAs use the same normalisation bounds and HV reference point per instance.
 """
 
-import numpy as np
 
-
-def normalise(objectives: np.ndarray, ideal: np.ndarray, nadir: np.ndarray) -> np.ndarray:
-    """Min-max scale objectives using bounds shared across all compared runs."""
+def normalise(objectives, ideal, nadir):
+    """Min-max scale a list of (f1, f2) points using bounds shared across all compared runs."""
     raise NotImplementedError
 
 
-def hypervolume_2d(objectives: np.ndarray, ref_point: np.ndarray) -> float:
-    """Exact 2-D hypervolume for minimisation."""
+def hypervolume_2d(objectives, ref_point):
+    """Exact 2-D hypervolume of a list of (f1, f2) points for minimisation."""
     raise NotImplementedError

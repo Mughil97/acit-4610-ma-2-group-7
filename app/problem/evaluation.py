@@ -1,14 +1,15 @@
-"""Objective evaluation (both minimised), computed only on feasible solutions.
+"""The two objectives, both minimised; only called on repaired individuals."""
 
-f1 = sum_i F_i * y_i          facility-opening cost
-f2 = sum_i sum_j C_ij * x_ij  customer-allocation cost (C_ij already includes demand)
-"""
-
-import numpy as np
-
-from app.problem.loader import CFLPInstance
+from app.problem.repair import decode
 
 
-def evaluate(open_mask: np.ndarray, assignment: np.ndarray, instance: CFLPInstance) -> tuple[float, float]:
-    """Return (f1, f2) for a feasible solution."""
-    raise NotImplementedError
+def evaluate(individual, instance):
+    f1 = 0.0
+    for facility in decode(individual):  # fixed cost of every open facility
+        f1 += instance.fixed_cost[facility]
+
+    f2 = 0.0
+    for customer, facility in enumerate(individual):  # not multiplied by demand
+        f2 += instance.alloc_cost[facility][customer]
+
+    return f1, f2
