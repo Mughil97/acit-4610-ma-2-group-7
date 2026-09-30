@@ -13,7 +13,7 @@ RESULTS_DIR = ROOT / "results"
 
 # OR-Library instances required by the assignment, grouped by size.
 INSTANCES = {
-    "small": ["cap41", "cap42"],
+    "small": ["cap61", "cap62"],
     "medium": ["cap101", "cap102"],
     "large": ["cap121", "cap122"],
 }
