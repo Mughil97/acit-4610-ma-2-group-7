@@ -1,1 +1,1 @@
-"""Algorithm-independent helpers: Pareto dominance, metrics, statistics, plotting."""
+"""Algorithm-independent helpers: Pareto dominance and plotting."""
