@@ -28,8 +28,9 @@ class FactoryTest(unittest.TestCase):
         self.assertEqual(algo.evaluations, 0)
 
     def test_unknown_name_raises(self):
+        instance, config = tiny_instance(), tiny_config()
         with self.assertRaisesRegex(ValueError, "Unknown algorithm 'spea2'"):
-            create_algorithm("spea2", tiny_instance(), tiny_config(), seed=1)
+            create_algorithm("spea2", instance, config, seed=1)
 
 
 if __name__ == "__main__":
