@@ -33,7 +33,10 @@ Expected output:
 vega   cap121  C1  seed 42:  2 trade-offs,  best f1    52,500,  best f2    1,380,867,  0.24 s
 
 saved 2 front points to .../results/fronts.csv
+saved 1 plot (the first run of each combination) to .../results/plots
 ```
+
+A window with the plot of the run opens at the end, like in the lab (see 2.2.2 for how to read it).
 
 The options:
 
@@ -44,14 +47,19 @@ The options:
 | `--configs` | any of `C1 C2 C3` (see the settings in 2.1) | all three |
 | `--runs` | independent runs per combination; run 1 uses seed 42, run 2 seed 43, ... | 10 |
 
-All VEGA runs (every instance, config and 10 seeds) take about a minute:
+**Run the entire thing** (VEGA on all six instances, C1 to C3, 10 seeds each: 180 runs, about a minute):
 
 ```bash
-python run_experiments.py --algorithms vega
+python run_experiments.py
 ```
 
-Every point of every final front is saved in `results/fronts.csv`
-(columns: algorithm, instance, config, seed, seconds, f1, f2). The same seed always gives the same result.
+It saves:
+
+- `results/fronts.csv`: every point of every final front (columns: algorithm, instance, config, seed, seconds, f1, f2);
+- `results/plots/`: one picture per instance and config, of its first run (seed 42), e.g. `vega_cap121_C3.png`.
+
+Windows only open when a run makes 3 plots or fewer; otherwise open the pictures in `results/plots/`.
+The same seed always gives the same result.
 
 The notebook [experiment/vega.ipynb](experiment/vega.ipynb) builds VEGA cell by cell, with a small demo and plots
 after each step. To open it: `pip install ipykernel`, open the notebook in VS Code, choose the `.venv` kernel and
@@ -317,8 +325,21 @@ One run per configuration with seed 42, on one small, one medium and one large i
 | cap121 | C3 | 3 | (52,500, 1,225,511), (60,000, 1,212,651), (67,500, 1,209,356) | 0.87 s |
 
 Every solution VEGA scored follows all three rules, and running the same seed again gives exactly the same numbers.
-The table shows seed 42 only. `python run_experiments.py --algorithms vega` runs all 10 seeds and saves every front
+The table shows seed 42 only. `python run_experiments.py` runs all 10 seeds and saves every front
 in `results/fronts.csv`. The hypervolume metric is not written yet.
+
+**One run in pictures** (cap121, C3, seed 42, from `results/plots/vega_cap121_C3.png`):
+
+![VEGA on cap121, C3](results/plots/vega_cap121_C3.png)
+
+- **Left, where the population started and ended:** grey is the random start, blue the last generation, red the
+  final trade-offs. The population moved from expensive (right) to cheap (bottom left), but ended in one small area.
+- **Middle, how the best costs changed:** the cheapest opening cost falls to about 28% of the start. The cheapest
+  allocation cost only falls to about 70% and goes up and down, because the children replace all the parents,
+  so the best solutions of a generation can be lost.
+- **Right, how much variety is left:** the number of different opening costs (how many different facility counts
+  the population still tries) drops from 13 to about 6, and only 2 to 3 trade-offs remain. On cap101 with C1 it drops
+  to a single opening cost and a single trade-off. This loss of variety is VEGA's known weakness.
 
 **Small instances:** the assignment lists cap41 and cap42, but there every facility holds 5,000 while two customers
 need more than that (12,912 and 5,495). With exactly one facility per customer they can not be placed anywhere, so
