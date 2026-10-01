@@ -1,0 +1,3 @@
+# Algorithms and summaries use only the Python standard library.
+# Optional PNG/JPG plots:
+Pillow>=10
