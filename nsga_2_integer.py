@@ -132,7 +132,7 @@ def evaluate_opening_cost(chromosome):
     opened_facilities = set(chromosome)
     for i in opened_facilities:
         opening_cost += facility_costs[i]
-    return opening_cost  # minimisation so 1/value to get lower number
+    return opening_cost 
 
 
 def evaluate_allocation_cost(chromosome):
@@ -326,11 +326,11 @@ def plot_results(results):
 
 
 def run():
-    population = [repair(initialise_chromosome()) for _ in range(10)]
+    population = [repair(initialise_chromosome()) for _ in range(100)]
     objectives = [evaluate(i) for i in population]
     fronts, ranks = nondominated_sort(objectives)
     distances = crowding_distances(objectives, fronts)
-    for _ in range(99):
+    for _ in range(300):
         print(_, len(fronts[0]), len(set(map(tuple, population))))
         mating_pool = nsga2_selection(population, ranks, distances)
         offspring = reproduce(mating_pool)
