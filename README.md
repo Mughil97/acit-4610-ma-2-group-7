@@ -21,8 +21,6 @@ This project implements and compares two evolutionary optimization approaches:
 
 The algorithms are evaluated using benchmark CFLP instances from the OR-Library.
 
-------------------------------------------------------------------------
-
 # Problem Description
 
 The Capacitated Facility Location Problem consists of:
@@ -72,7 +70,6 @@ where:
 
 Both objectives are minimized simultaneously.
 
-------------------------------------------------------------------------
 # Algorithms
 
 ## VEGA (Vector Evaluated Genetic Algorithm)
@@ -115,7 +112,6 @@ Population initialization\
 
 Both algorithms are implemented under the same experimental framework to allow a fair comparison.
 
-------------------------------------------------------------------------
 
 # Solution Representation
 
@@ -203,8 +199,6 @@ The same chromosome representation, repair mechanism, and objective evaluation p
 and NSGA-II to ensure a fair algorithm comparison.
 
 
-------------------------------------------------------------------------
-
 # Dataset
 
 The project uses benchmark Capacitated Facility Location Problem instances from the OR-Library.
@@ -227,7 +221,6 @@ Each instance contains:
 - Customer demands
 - Customer-facility allocation costs
 
-------------------------------------------------------------------------
 
 # Experimental Setup
 
@@ -243,8 +236,8 @@ The algorithms are evaluated using multiple configurations with different evalua
 
 Each configuration is evaluated using multiple independent runs to account for the stochastic nature of evolutionary algorithms.
 
-The experiments are performed on small, medium, and large CFLP benchmark instances to analyse algorithm behavior under different problem scales.
-------------------------------------------------------------------------
+**The experiments are performed on small, medium, and large CFLP benchmark instances to analyse algorithm behavior under different problem scales.**
+
 
 # Evaluation Metrics
 
@@ -261,7 +254,7 @@ Hypervolume measures the quality of the obtained Pareto front by considering bot
 
 A higher hypervolume indicates that the obtained solutions dominate a larger portion of the objective space relative to a reference point.
 
-------------------------------------------------------------------------
+
 # Repository Structure
 
 ```text
@@ -297,7 +290,7 @@ ACIT4610_Project2/
 │
 └── README.md
 ```
-------------------------------------------------------------------------
+
 # Installation
 
 ## 1. Clone the repository
@@ -343,7 +336,6 @@ Install the required Python packages:
 ```bash
 pip install -r requirements.txt
 ```
-------------------------------------------------------------------------
 
 # Running Tests
 
@@ -362,8 +354,6 @@ The tests verify important project components, including:
 
 A successful test run confirms that the core components are working correctly before running experiments.
 
-------------------------------------------------------------------------
-
 # Running Experiments
 
 Run the complete experiment setup:
@@ -380,7 +370,6 @@ The generated results include:
 - Hypervolume measurements
 - Runtime statistics
 - Pareto front visualizations
-------------------------------------------------------------------------
 
 # Academic Integrity Boundary
 
@@ -415,7 +404,6 @@ The group developed the project-specific implementation, including:
 The repository does not contain copied solutions from previous
 submissions or external assignment solutions.
 
-------------------------------------------------------------------------
 
 # Team Development Workflow
 
@@ -427,13 +415,11 @@ The project uses:
 -   Meaningful commit messages
 -   Documentation of design decisions
 
-------------------------------------------------------------------------
 
 # Authors
 
 ACIT4610 Project Group 7
 
-------------------------------------------------------------------------
 # License
 
 This repository is created for educational purposes as part of the ACIT4610 Evolutionary
