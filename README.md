@@ -1,4 +1,4 @@
-# ACIT4610 Project 2  
+# ACIT4610 Project 2  - Group 7
 # Multi-Objective Evolutionary Optimization for the Capacitated Facility Location Problem (CFLP)
 
 ## Project Overview
