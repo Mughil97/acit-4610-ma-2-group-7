@@ -299,51 +299,111 @@ def deduplicate(population, objectives):
     return pop, obj
 
 
-def plot_results(results):
-    fig, axes = plt.subplots(
-        1, len(results), figsize=(6 * len(results), 4), squeeze=False
-    )
+def plot_results(objectives, nd_front_indices, hv_history):
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    for ax, (name, population) in zip(axes[0], results.items()):
-        # Evaluate the actual integer chromosomes from our population
-        objectives = [evaluate(individual) for individual in population]
-        print(objectives)
+    # --- Panel 1: Objective Space ---
+    ax1 = axes[0]
+    
+    # Plot all dominated solutions in gray
+    dominated_f1 = [objectives[i][0] for i in range(len(objectives)) if i not in nd_front_indices]
+    dominated_f2 = [objectives[i][1] for i in range(len(objectives)) if i not in nd_front_indices]
+    if dominated_f1:
+        ax1.scatter(dominated_f1, dominated_f2, alpha=0.4, color='gray', label="Dominated")
 
-        ax.scatter(
-            [f[0] for f in objectives],
-            [f[1] for f in objectives],
-            alpha=0.7,
-            label="Final population",
-        )
-        ax.set(title=name, xlabel="f1 (minimize)", ylabel="f2 (minimize)")
-        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
-        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
-        ax.grid(alpha=0.25)
-        ax.legend()
+    # Plot Non-dominated (Rank 1) solutions in red with a connecting line
+    nd_objectives = sorted([objectives[i] for i in nd_front_indices], key=lambda x: x[0])
+    nd_f1 = [obj[0] for obj in nd_objectives]
+    nd_f2 = [obj[1] for obj in nd_objectives]
+    
+    ax1.plot(nd_f1, nd_f2, color='red', marker='o', linestyle='-', linewidth=2, label="Pareto Front (Rank 1)")
+
+    ax1.set(title="Final Population Objective Space", xlabel="Opening Cost (Minimize)", ylabel="Allocation Cost (Minimize)")
+    ax1.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax1.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax1.grid(alpha=0.25)
+    ax1.legend()
+
+    # --- Panel 2: Hypervolume Evolution ---
+    ax2 = axes[1]
+    ax2.plot(range(len(hv_history)), hv_history, color='blue', linewidth=2)
+    ax2.set(title="Hypervolume Over Generations", xlabel="Generation", ylabel="Hypervolume")
+    ax2.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    ax2.grid(alpha=0.25)
 
     fig.tight_layout()
     plt.show()
 
 
+def calculate_hypervolume_2d(front_objectives, ref_point):
+    """
+    Calculates the 2D hypervolume of a Pareto front.
+    Assumes minimization for both objectives.
+    """
+    # Filter out any points that are strictly worse than the reference point
+    valid_points = [
+        obj for obj in front_objectives 
+        if obj[0] <= ref_point[0] and obj[1] <= ref_point[1]
+    ]
+    
+    if not valid_points:
+        return 0.0
+
+    # Sort the front by the first objective ascending
+    sorted_front = sorted(valid_points, key=lambda x: x[0])
+    
+    hv = 0.0
+    prev_f1 = ref_point[0]
+
+    # Calculate area by sweeping rectangles backwards from the largest f1
+    for f1, f2 in reversed(sorted_front):
+        width = prev_f1 - f1
+        height = ref_point[1] - f2
+        hv += width * height
+        prev_f1 = f1
+
+    return hv
+
+
 def run():
-    population = [repair(initialise_chromosome()) for _ in range(100)]
+    pop_size = 100
+    generations = 300
+    
+    population = [repair(initialise_chromosome()) for _ in range(pop_size)]
     objectives = [evaluate(i) for i in population]
     fronts, ranks = nondominated_sort(objectives)
     distances = crowding_distances(objectives, fronts)
-    for _ in range(300):
-        print(_, len(fronts[0]), len(set(map(tuple, population))))
+    
+    # Establish a reference point for hypervolume based on the worst initial solutions
+    max_f1 = max(obj[0] for obj in objectives)
+    max_f2 = max(obj[1] for obj in objectives)
+    ref_point = (max_f1 * 1.1, max_f2 * 1.1)  # Offset by 10% to capture boundary points
+    
+    hv_history = []
+
+    for gen in range(generations):
+        # 1. Track Hypervolume for the current Rank 1 front
+        nd_objectives = [objectives[i] for i in fronts[0]]
+        current_hv = calculate_hypervolume_2d(nd_objectives, ref_point)
+        hv_history.append(current_hv)
+        
+        print(f"Gen {gen:03d} | Front Size: {len(fronts[0]):03d} | Unique Solutions: {len(set(map(tuple, population))):03d} | HV: {current_hv:,.0f}")
+
+        # 2. Evolve
         mating_pool = nsga2_selection(population, ranks, distances)
         offspring = reproduce(mating_pool)
         offspring_objectives = [evaluate(i) for i in offspring]
-        # combined_pop, combined_obj = deduplicate(
-        #     population + offspring, objectives + offspring_objectives
-        # )
+        
+        # 3. Select (Fixed from size 10 to pop_size)
         population, objectives, ranks, distances = environmental_selection(
-            population + offspring, objectives + offspring_objectives, 10
+            population + offspring, objectives + offspring_objectives, pop_size
         )
+        
+        # Re-calculate fronts so we have the accurate Rank 1 indices for the next iteration/plotting
+        fronts, ranks = nondominated_sort(objectives)
 
-    results = {"NSGA-II": population}
-    plot_results(results)
+    # Plot the final results
+    plot_results(objectives, fronts[0], hv_history)
 
 
 if __name__ == "__main__":
