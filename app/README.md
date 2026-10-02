@@ -1,7 +1,7 @@
 # acit-4610-ma-2-group-7
 
 ACIT4610's Mandatory Assignment 2 - Group 7: the **multi-objective Capacitated Facility Location Problem (CFLP)**
-solved with the evolutionary algorithm **VEGA**.
+solved with two evolutionary algorithms, **VEGA** and **NSGA-II**.
 
 ---
 
@@ -19,15 +19,16 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt    # only matplotlib, for plots
 ```
 
-### 1.2 How to run VEGA
+### 1.2 How to run the experiments
 
-**Run the entire thing** (VEGA on all six instances, C1 to C3, 10 seeds each: 180 runs, a few minutes):
+**Run the entire thing** (VEGA and NSGA-II on all six instances, C1 to C3, 10 seeds each: 360 runs, about 5
+minutes). A window plays the first run (seed 42) of every instance and configuration, both algorithms on one plot:
 
 ```bash
 python run_experiments.py
 ```
 
-One run of VEGA on cap121 with configuration C3:
+One run of each algorithm on cap121 with configuration C3:
 
 ```bash
 python run_experiments.py --instances cap121 --configs C3 --runs 1
@@ -35,16 +36,23 @@ python run_experiments.py --instances cap121 --configs C3 --runs 1
 
 The options:
 
-| Option         | Meaning                                                                  | Default   |
-| -------------- | ------------------------------------------------------------------------ | --------- |
-| `--algorithms` | `vega`                                                                   | `vega`    |
-| `--instances`  | any of `cap61 cap62 cap101 cap102 cap121 cap122`                         | all six   |
-| `--configs`    | any of `C1 C2 C3` (see the settings in 2.1)                              | all three |
-| `--runs`       | independent runs per combination; run 1 uses seed 42, run 2 seed 43, ... | 10        |
+| Option             | Meaning                                                                  | Default   |
+| ------------------ | ------------------------------------------------------------------------ | --------- |
+| `--algorithms`     | any of `vega nsga2`                                                      | both      |
+| `--instances`      | any of `cap61 cap62 cap101 cap102 cap121 cap122`                         | all six   |
+| `--configs`        | any of `C1 C2 C3` (see the settings in 2.1)                              | all three |
+| `--runs`           | independent runs per combination; run 1 uses seed 42, run 2 seed 43, ... | 10        |
+| `--representation` | `binary` (Sofia's design) or `integer` (see the end of 2.1)              | `binary`  |
+
+What a run saves (an integer run saves the same files in `results/integer/`):
 
 - `results/fronts.csv`: every point of every final front (columns: algorithm, instance, config, seed, seconds, f1, f2);
-- `results/plots/`: one picture per instance and config, of its first run (seed 42), e.g. `vega_cap121_C3.png`
-  (see 2.2.2 for how to read it).
+- `results/summary.csv`: the hypervolume table (see 3.2);
+- `results/plots/`: for every instance and config, one picture per algorithm of its first run (seed 42), e.g.
+  `vega_cap121_C3.png` (see 2.2.2), and both final fronts together, e.g. `compare_cap121_C3.png` (see 3.2).
+
+Every run rewrites these files with only what it ran, so run the full `python run_experiments.py` again to get all
+the results back.
 
 ---
 
@@ -237,6 +245,26 @@ Only the parts below change, VEGA and NSGA-II stay the same:
 - **mutation:** a customer moves to another facility that is already open (a gene is a customer here, so on
   average 1 or 2 customers move per child).
 
+**Integer against binary** (same settings and seeds, 10 runs each; the integer results are in `results/integer/`):
+
+| Instance | Config | Trade-offs, integer (VEGA / NSGA-II) | Trade-offs, binary (VEGA / NSGA-II) | Lowest f2 found by NSGA-II, integer / binary |
+| -------- | ------ | ------------------------------------ | ----------------------------------- | -------------------------------------------- |
+| cap61    | C1     | 1.2 / 4.1                            | 6.1 / 13.0                          | 872,394 / 837,970                            |
+| cap61    | C2     | 1.6 / 5.4                            | 6.6 / 13.0                          | 849,640 / 837,970                            |
+| cap61    | C3     | 2.5 / 7.3                            | 7.8 / 13.0                          | 838,472 / 837,970                            |
+| cap101   | C1     | 1.1 / 4.8                            | 8.0 / 24.9                          | 768,273 / 652,291                            |
+| cap101   | C2     | 1.0 / 6.2                            | 9.5 / 25.0                          | 739,387 / 652,291                            |
+| cap101   | C3     | 1.0 / 9.9                            | 10.4 / 25.0                         | 711,409 / 652,291                            |
+| cap121   | C1     | 1.6 / 4.6                            | 8.1 / 39.6                          | 764,183 / 625,106                            |
+| cap121   | C2     | 2.0 / 7.2                            | 8.6 / 43.8                          | 756,754 / 624,071                            |
+| cap121   | C3     | 3.3 / 10.0                           | 9.2 / 45.5                          | 706,708 / 624,071                            |
+
+With the integer design both algorithms find far fewer trade-offs and a higher allocation cost: evolution has to find
+every customer's facility itself, while in the binary design it only chooses which facilities are open and the
+decoder serves the customers. NSGA-II still beats VEGA there, with a higher mean hypervolume in every combination
+(`results/integer/summary.csv`). Each `summary.csv` is scaled on its own runs, so compare hypervolumes only within one
+file.
+
 #### Where each part is in the code
 
 The binary function comes first, the integer one in brackets.
@@ -257,7 +285,7 @@ The decoder's two fixed orders (customers by demand, facilities by cost) are wor
 
 VEGA (Vector Evaluated Genetic Algorithm, Schaffer 1984) is the first real multi-objective evolutionary algorithm
 (Lecture 3, slides 33-35). It is a normal genetic algorithm with one change: **how parents are chosen**.
-Code: [app/algorithms/vega.py](app/algorithms/vega.py).
+Code: [app/algorithms/vega.py](algorithms/vega.py).
 
 #### 2.2.1 VEGA Algorithm
 
@@ -313,7 +341,7 @@ while evaluations < budget:
     children = []
     for each pair of parents:
         child1, child2 = crossover(pair)       # probability p_c
-        mutate each child                      # probability p_m per customer
+        mutate each child                      # each gene changes with probability flips / genes
         repair each child
         add them to children
     scores     = (f1, f2) of every child
@@ -324,36 +352,38 @@ return the non-dominated scores
 
 #### 2.2.2 VEGA Result
 
-One run per configuration with seed 42, on one small, one medium and one large instance:
+One run per configuration with seed 42, on one small, one medium and one large instance. The fronts are longer
+than a table cell, so the table shows the two ends of each front (the cheapest f1 and the cheapest f2); every point
+is in `results/fronts.csv`.
 
-| Instance | Config | Trade-offs found | Pareto front (f1, f2)                                         | Time   |
-| -------- | ------ | ---------------- | ------------------------------------------------------------- | ------ |
-| cap61    | C1     | 3                | (52,500, 1,402,757), (60,000, 1,351,098), (67,500, 1,331,653) | 0.14 s |
-| cap61    | C2     | 2                | (52,500, 1,327,786), (60,000, 1,201,305)                      | 0.25 s |
-| cap61    | C3     | 3                | (45,000, 1,265,071), (52,500, 1,250,551), (60,000, 1,217,828) | 0.49 s |
-| cap101   | C1     | 1                | (30,000, 1,153,560)                                           | 0.17 s |
-| cap101   | C2     | 1                | (37,500, 1,100,450)                                           | 0.29 s |
-| cap101   | C3     | 1                | (45,000, 1,144,740)                                           | 0.59 s |
-| cap121   | C1     | 2                | (52,500, 1,469,533), (67,500, 1,380,867)                      | 0.24 s |
-| cap121   | C2     | 2                | (52,500, 1,555,781), (60,000, 1,262,842)                      | 0.44 s |
-| cap121   | C3     | 3                | (52,500, 1,225,511), (60,000, 1,212,651), (67,500, 1,209,356) | 0.87 s |
+| Instance | Config | Trade-offs found | Ends of the Pareto front (f1, f2)         | Time   |
+| -------- | ------ | ---------------- | ----------------------------------------- | ------ |
+| cap61    | C1     | 7                | (22,500, 1,713,744) ... (82,500, 855,658) | 0.30 s |
+| cap61    | C2     | 8                | (22,500, 1,300,377) ... (75,000, 867,126) | 0.99 s |
+| cap61    | C3     | 7                | (22,500, 1,216,291) ... (67,500, 875,739) | 3.35 s |
+| cap101   | C1     | 5                | (30,000, 862,196) ... (97,500, 749,429)   | 0.29 s |
+| cap101   | C2     | 8                | (22,500, 935,818) ... (97,500, 719,641)   | 0.87 s |
+| cap101   | C3     | 10               | (37,500, 966,160) ... (120,000, 704,732)  | 3.50 s |
+| cap121   | C1     | 10               | (60,000, 957,212) ... (180,000, 672,788)  | 0.31 s |
+| cap121   | C2     | 9                | (60,000, 935,394) ... (142,500, 690,842)  | 0.88 s |
+| cap121   | C3     | 11               | (82,500, 976,987) ... (180,000, 682,810)  | 3.76 s |
 
 Every solution VEGA scored follows all three rules, and running the same seed again gives exactly the same numbers.
-The table shows seed 42 only. `python run_experiments.py` runs all 10 seeds and saves every front
-in `results/fronts.csv`. The hypervolume metric is not written yet.
+The table shows seed 42 only; the results of all 10 seeds, with the hypervolume, are in 3.2 next to NSGA-II.
 
 **One run in pictures** (cap121, C3, seed 42, from `results/plots/vega_cap121_C3.png`):
 
-![VEGA on cap121, C3](results/plots/vega_cap121_C3.png)
+![VEGA on cap121, C3](../results/plots/vega_cap121_C3.png)
 
-- **Left, where the population started and ended:** grey is the random start, blue the last generation, red the
-  final trade-offs. The population moved from expensive (right) to cheap (bottom left), but ended in one small area.
-- **Middle, how the best costs changed:** the cheapest opening cost falls to about 28% of the start. The cheapest
-  allocation cost only falls to about 70% and goes up and down, because the children replace all the parents,
-  so the best solutions of a generation can be lost.
-- **Right, how much variety is left:** the number of different opening costs (how many different facility counts
-  the population still tries) drops from 13 to about 6, and only 2 to 3 trade-offs remain. On cap101 with C1 it drops
-  to a single opening cost and a single trade-off. This loss of variety is VEGA's known weakness.
+- **Left, where the population started and ended:** grey is the random start (opening costs 105,000 to 247,500),
+  blue the last generation, red the final trade-offs. The population moved a little towards cheaper opening costs,
+  but stayed a wide cloud above its 11 trade-offs. The cheapest allocation cost of the start (649,091, the grey dot
+  at the bottom right) was lost.
+- **Middle, how the best costs changed:** the cheapest opening cost jumps between about half and all of the start
+  and never settles. The cheapest allocation cost never gets below the start (it stays between 100% and about 108%),
+  because the children replace all the parents, so the best solutions of a generation can be lost.
+- **Right, how much variety is left:** the number of different opening costs (about 15 to 22) and of trade-offs
+  (about 5 to 15) go up and down without a trend: VEGA keeps searching, but holds on to nothing.
 
 **Small instances:** the assignment lists cap41 and cap42, but there every facility holds 5,000 while two customers
 need more than that (12,912 and 5,495). With exactly one facility per customer they can not be placed anywhere, so
@@ -365,19 +395,23 @@ If cap41 or cap42 is loaded, the code stops with a clear message.
 **What works:**
 
 - every solution follows all three rules, and runs can be repeated exactly with the same seed;
-- it is fast (under a second per run) and simple: only the parent choice differs from a plain genetic algorithm.
+- it is fast (0.3 to 3.8 s per run) and simple: only the parent choice differs from a plain genetic algorithm;
+- with the binary design it finds 5 to 11 trade-offs per run (6.1 to 10.4 on average over 10 seeds).
 
 **What does not work well:**
 
-- it finds only **1 to 3 trade-offs**, all close together. On cap121, f1 could range from 22,500 (the fewest
-  facilities that can hold all the demand) to 367,500 (every facility open), but VEGA only covers 52,500 to 67,500;
+- its front covers only part of what is possible. On cap121, f1 could range from 22,500 (the fewest facilities that
+  can hold all the demand) to 367,500 (every facility open), but VEGA's seed-42 C3 front only covers 82,500 to
+  180,000;
+- it does not keep its best solutions: on cap121 with C3 its cheapest f2 goes up in 245 of 499 generations and ends
+  at 682,810, worse than its random start (649,091);
 - this is VEGA's known weakness (Lecture 3, slide 43): each solution is judged by one score at a time, and all
-  the children replace the parents, so good solutions get lost and the population loses variety.
+  the children replace the parents, so good solutions get lost. NSGA-II beats it on every seed (3.2).
 
-**Effect of the configurations (one seed, so only a first impression):** on cap121, a bigger population and budget
-(C1 to C3) steadily lowered the best f2 (1,380,867 to 1,209,356) and found one more trade-off, while the run time
-roughly doubled with each step. On cap101 there was no clear improvement. The 10-seed runs will show whether these
-differences are real.
+**Effect of the configurations (10 seeds, the table in 3.2):** a bigger population and budget give VEGA no steady
+gain in hypervolume (cap61: 1.055, 1.083, 1.088; cap101: 0.920, 0.931, 0.908; cap121: 0.943, 0.966, 0.919). The
+number of trade-offs grows a little with the population (cap101: 8.0, 9.5, 10.4; cap121: 8.1, 8.6, 9.2), and the run
+time grows with the evaluations (about 0.3, 0.9 and 3.3 s per run for C1, C2 and C3).
 
 ---
 
@@ -617,7 +651,9 @@ for VEGA in 2.2.2:
 ![VEGA and NSGA-II on cap121, C3](../results/plots/compare_cap121_C3.png)
 
 NSGA-II's front (orange squares) runs over the whole range, from 22,500 to 367,500, and lies below VEGA's: every one
-of VEGA's 11 trade-offs (opening costs 82,500 to 180,000) is dominated by an NSGA-II trade-off.
+of VEGA's 11 trade-offs (opening costs 82,500 to 180,000) is dominated by an NSGA-II trade-off. The dots are the last
+generations, as in the live window: NSGA-II's sit on its front (a dot inside every square), VEGA's form a cloud above
+its front.
 
 ### 3.3 NSGA-II Verdict
 
