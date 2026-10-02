@@ -34,10 +34,10 @@ def draw_fronts(ax, fronts, title, populations=None):
     ax.legend(loc="upper right")
 
 
-def plot_fronts(fronts, title, out_path):
-    """Every algorithm's final front on one plot ({name: list of (f1, f2)}); saved to out_path."""
+def plot_fronts(fronts, title, out_path, populations=None):
+    """Every algorithm's final front, and population if given, on one plot (like the live window); saved to out_path."""
     fig, ax = plt.subplots(figsize=(8, 6))
-    draw_fronts(ax, fronts, title)
+    draw_fronts(ax, fronts, title, populations)
     fig.tight_layout()
     fig.savefig(out_path, dpi=110)
     return fig

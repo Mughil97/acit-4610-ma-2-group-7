@@ -97,17 +97,23 @@ def run_combination(pool, instance_name, config, algorithms, runs, rows, close_w
     return first_runs
 
 
-def save_checkpoint(rows, instance_name, config_name, first_runs, results_dir):
-    """Save a picture of each algorithm's first run, both fronts together, and every front point so far."""
+def save_pictures(instance_name, config_name, first_runs, results_dir):
+    """A picture of each algorithm's first run, and both together like the live window's last frame."""
     plots_dir = results_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
-    fronts = {}
+    fronts, populations = {}, {}
     for algorithm, (name, history) in first_runs.items():
         title = f"{name} - {instance_name} - {config_name} (seed {BASE_SEED})"
         plt.close(plot_run(history, title, plots_dir / f"{algorithm}_{instance_name}_{config_name}.png"))
-        fronts[name] = non_dominated(history[-1])
-    title = f"{instance_name} - {config_name} (seed {BASE_SEED})"
-    plt.close(plot_fronts(fronts, title, plots_dir / f"compare_{instance_name}_{config_name}.png"))
+        fronts[name], populations[name] = non_dominated(history[-1]), history[-1]
+    last = max(len(history) for _, history in first_runs.values()) - 1
+    title = f"{instance_name} - {config_name} (seed {BASE_SEED}), generation {last} of {last}"
+    plt.close(plot_fronts(fronts, title, plots_dir / f"compare_{instance_name}_{config_name}.png", populations))
+
+
+def save_checkpoint(rows, instance_name, config_name, first_runs, results_dir):
+    """Save the pictures of the first runs, and every front point so far."""
+    save_pictures(instance_name, config_name, first_runs, results_dir)
 
     with open(results_dir / "fronts.csv", "w", newline="") as file:
         writer = csv.writer(file)
