@@ -28,7 +28,7 @@ class ExperimentConfig:
     pop_size: int
     max_evaluations: int
     crossover_prob: float
-    mutation_flips: int  # facilities flipped per child on average: each flips with probability mutation_flips / m
+    mutation_flips: int  # genes changed per child on average: each gene changes with probability flips / genes
     tournament_size: int = 2
 
 

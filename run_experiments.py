@@ -4,6 +4,7 @@ together on one plot, save fronts and pictures to results/, and print a hypervol
 Examples:
     python run_experiments.py                                                    # everything, 10 runs each
     python run_experiments.py --instances cap121 --configs C3 --runs 1           # one run of each algorithm
+    python run_experiments.py --representation integer                           # saved in results/integer/
 
 Statistical tests will be added here later.
 """
@@ -28,11 +29,11 @@ ALL_CONFIGS = [config.name for config in CONFIGS]
 PRINT_EVERY = 20  # one terminal line every 20 generations while the runs play
 
 
-def run_seed(algorithm, instance_name, config_name, seed, keep_history):
+def run_seed(algorithm, instance_name, config_name, seed, keep_history, representation):
     """One run, done in its own process; return (name, front, seconds, history or None)."""
     config = next(config for config in CONFIGS if config.name == config_name)
     start = time.perf_counter()
-    moea = create_algorithm(algorithm, load_by_name(instance_name), config, seed)
+    moea = create_algorithm(algorithm, load_by_name(instance_name), config, seed, representation)
     front = moea.run()
     return moea.name, front, time.perf_counter() - start, moea.history if keep_history else None
 
@@ -66,9 +67,10 @@ def watch_runs(histories, title, close_when_done):
     animate_runs(histories, title, on_frame, close_when_done)  # returns when the window is closed
 
 
-def run_combination(pool, instance_name, config, algorithms, runs, rows, close_window):
+def run_combination(pool, instance_name, config, algorithms, runs, rows, close_window, representation):
     """Start every algorithm and seed at the same time, play the first runs together, then collect the rest."""
-    futures = {(algorithm, run): pool.submit(run_seed, algorithm, instance_name, config.name, BASE_SEED + run, run == 0)
+    futures = {(algorithm, run): pool.submit(run_seed, algorithm, instance_name, config.name, BASE_SEED + run,
+                                             run == 0, representation)
                for algorithm in algorithms for run in range(runs)}
 
     first_runs, failed = {}, set()  # first_runs: algorithm -> (name, history of seed 42)
@@ -95,9 +97,9 @@ def run_combination(pool, instance_name, config, algorithms, runs, rows, close_w
     return first_runs
 
 
-def save_checkpoint(rows, instance_name, config_name, first_runs):
+def save_checkpoint(rows, instance_name, config_name, first_runs, results_dir):
     """Save a picture of each algorithm's first run, both fronts together, and every front point so far."""
-    plots_dir = RESULTS_DIR / "plots"
+    plots_dir = results_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
     fronts = {}
     for algorithm, (name, history) in first_runs.items():
@@ -107,16 +109,17 @@ def save_checkpoint(rows, instance_name, config_name, first_runs):
     title = f"{instance_name} - {config_name} (seed {BASE_SEED})"
     plt.close(plot_fronts(fronts, title, plots_dir / f"compare_{instance_name}_{config_name}.png"))
 
-    with open(RESULTS_DIR / "fronts.csv", "w", newline="") as file:
+    with open(results_dir / "fronts.csv", "w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["algorithm", "instance", "config", "seed", "seconds", "f1", "f2"])
         writer.writerows(rows)
 
-    print(f"checkpoint: saved {len(first_runs) + 1} pictures to results/plots/ "
-          f"and {len(rows)} front points so far to results/fronts.csv", flush=True)
+    folder = results_dir.relative_to(RESULTS_DIR.parent)
+    print(f"checkpoint: saved {len(first_runs) + 1} pictures to {folder}/plots/ "
+          f"and {len(rows)} front points so far to {folder}/fronts.csv", flush=True)
 
 
-def summarise(rows):
+def summarise(rows, results_dir):
     """Hypervolume of every run, scaled the same way for every algorithm on an instance; print and save a table."""
     runs = {}  # (algorithm, instance, config, seed) -> its front and run time
     scale = {}  # instance -> (ideal, nadir): the best and worst f1 and f2 that any run found on it
@@ -144,7 +147,7 @@ def summarise(rows):
         print(f"{algorithm:<10}{instance:<9}{config:<7}{n:>5}{hv_mean:>9.3f}{hv_std:>8.3f}{hv_best:>9.3f}"
               f"{hv_worst:>9.3f}{trade_offs:>11.1f}{seconds:>9.2f}")
 
-    with open(RESULTS_DIR / "summary.csv", "w", newline="") as file:
+    with open(results_dir / "summary.csv", "w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["algorithm", "instance", "config", "runs", "hv_mean", "hv_std", "hv_best", "hv_worst",
                          "mean_trade_offs", "mean_seconds"])
@@ -161,9 +164,13 @@ def main():
                         help="config names, e.g. C1 C2 C3 (default: all three)")
     parser.add_argument("--runs", type=int, default=N_RUNS,
                         help=f"independent runs (seeds) per combination (default: {N_RUNS})")
+    parser.add_argument("--representation", choices=["binary", "integer"], default="binary",
+                        help="how a solution is stored (default: binary; integer results go to results/integer/)")
     args = parser.parse_args()
 
     configs = [config for config in CONFIGS if config.name in args.configs]
+    results_dir = RESULTS_DIR if args.representation == "binary" else RESULTS_DIR / "integer"
+    results_dir.mkdir(parents=True, exist_ok=True)
     rows = []  # one row per point of every final front
     # several instances or configs: each window closes by itself, so the next one can start
     close_windows = len(args.instances) * len(configs) > 1
@@ -174,14 +181,17 @@ def main():
             print(f"\nloading {instance_name}: {instance.m} facilities, {instance.n} customers", flush=True)
             for config in configs:
                 print(f"{instance_name}, {config.name}: {args.runs} runs of {' and '.join(args.algorithms)} at the same "
-                      f"time (population {config.pop_size}, {config.max_evaluations:,} evaluations each)", flush=True)
-                first_runs = run_combination(pool, instance_name, config, args.algorithms, args.runs, rows, close_windows)
+                      f"time ({args.representation}, population {config.pop_size}, "
+                      f"{config.max_evaluations:,} evaluations each)", flush=True)
+                first_runs = run_combination(pool, instance_name, config, args.algorithms, args.runs, rows,
+                                             close_windows, args.representation)
                 if first_runs:
-                    save_checkpoint(rows, instance_name, config.name, first_runs)
+                    save_checkpoint(rows, instance_name, config.name, first_runs, results_dir)
 
     if rows:
-        summarise(rows)
-    print("\ndone: results/fronts.csv, results/summary.csv and pictures in results/plots/")
+        summarise(rows, results_dir)
+    folder = results_dir.relative_to(RESULTS_DIR.parent)
+    print(f"\ndone: {folder}/fronts.csv, {folder}/summary.csv and pictures in {folder}/plots/")
 
 
 if __name__ == "__main__":
