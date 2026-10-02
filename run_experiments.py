@@ -1,24 +1,26 @@
-"""Entry point: run the MOEAs on every instance, config and seed, play the first run of each combination in a
-window, save the final fronts to results/fronts.csv and a picture of each first run to results/plots/.
+"""Entry point: run the MOEAs on every instance, config and seed, play the first run of each in a window,
+save the fronts and pictures to results/, and print a hypervolume table (saved to results/summary.csv).
 
 Examples:
     python run_experiments.py                                                    # everything, 10 runs each
-    python run_experiments.py --instances cap121 --configs C3 --runs 1           # one run
+    python run_experiments.py --instances cap121 --configs C3 --runs 1           # one run of each algorithm
 
-Metrics (hypervolume) and statistical tests will be added here once app/utils has them.
+Statistical tests will be added here later.
 """
 
 import argparse
 import csv
 import time
+from statistics import mean, stdev
 
 import matplotlib.pyplot as plt
 
 from app.algorithms import available_algorithms, create_algorithm
 from app.config import BASE_SEED, CONFIGS, INSTANCES, N_RUNS, RESULTS_DIR
 from app.problem.loader import load_by_name
+from app.utils.metrics import REFERENCE_POINT, hypervolume_2d, normalise
 from app.utils.pareto import non_dominated
-from app.utils.plotting import animate_run, plot_run
+from app.utils.plotting import animate_run, plot_fronts, plot_run
 
 ALL_INSTANCES = [name for names in INSTANCES.values() for name in names]
 ALL_CONFIGS = [config.name for config in CONFIGS]
@@ -47,26 +49,8 @@ def watch_run(history, title, close_when_done):
     animate_run(history, title, on_frame, close_when_done)  # returns when the window is closed
 
 
-def save_checkpoint(rows, algorithm, instance_name, config_name, history):
-    """Save the picture of this combination's first run and every front point so far; print what was saved."""
-    plots_dir = RESULTS_DIR / "plots"
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    picture = plots_dir / f"{algorithm}_{instance_name}_{config_name}.png"
-    title = f"{algorithm.upper()} on {instance_name}, {config_name} (seed {BASE_SEED})"
-    plt.close(plot_run(history, title, picture))
-
-    fronts = RESULTS_DIR / "fronts.csv"
-    with open(fronts, "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["algorithm", "instance", "config", "seed", "seconds", "f1", "f2"])
-        writer.writerows(rows)
-
-    print(f"checkpoint: saved results/plots/{picture.name} and {len(rows)} front points so far to results/fronts.csv",
-          flush=True)
-
-
-def run_once(algorithm, instance, config, seed, rows, watch=False, close_window=False):
-    """Run once, print one line and add the front to rows; return the run's history, or None if it can not run."""
+def run_once(algorithm, instance, config, seed, rows, watch, close_window):
+    """Run once, print one line and add the front to rows; return (name, history), or None if it can not run."""
     start = time.perf_counter()
     moea = create_algorithm(algorithm, instance, config, seed)
     try:
@@ -84,32 +68,83 @@ def run_once(algorithm, instance, config, seed, rows, watch=False, close_window=
     for f1, f2 in front:
         rows.append([algorithm, instance.name, config.name, seed, round(seconds, 3), f1, f2])
     if watch:
-        title = f"{algorithm.upper()} on {instance.name}, {config.name} (seed {seed})"
-        watch_run(moea.history, title, close_window)
-    return moea.history
+        watch_run(moea.history, f"{moea.name} on {instance.name}, {config.name} (seed {seed})", close_window)
+    return moea.name, moea.history
 
 
-def run_instance(algorithm, instance, configs, runs, rows, close_windows):
-    """Every config and seed of one algorithm on one instance, with a checkpoint after each config."""
-    for config in configs:
-        print(f"{instance.name}, {config.name}: {runs} runs "
-              f"(population {config.pop_size}, {config.max_evaluations:,} evaluations each)", flush=True)
-        first_history = None
-        for run in range(runs):
-            seed = BASE_SEED + run  # run 1 uses seed 42, run 2 uses seed 43, ...
-            history = run_once(algorithm, instance, config, seed, rows, run == 0, close_windows)  # play the first
-            if history is None:
-                return
-            if run == 0:
-                first_history = history
-        if first_history:
-            save_checkpoint(rows, algorithm, instance.name, config.name, first_history)
+def run_combination(algorithm, instance, config, runs, rows, close_window):
+    """Every seed of one algorithm on one instance and config; return (name, history) of the first run, or None."""
+    first = None
+    for run in range(runs):
+        seed = BASE_SEED + run  # run 1 uses seed 42, run 2 uses seed 43, ...
+        result = run_once(algorithm, instance, config, seed, rows, run == 0, close_window)  # play the first run
+        if result is None:
+            return None
+        if run == 0:
+            first = result
+    return first
+
+
+def save_checkpoint(rows, instance_name, config_name, first_runs):
+    """Save a picture of each algorithm's first run, both fronts together, and every front point so far."""
+    plots_dir = RESULTS_DIR / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+    fronts = {}
+    for algorithm, (name, history) in first_runs.items():
+        title = f"{name} on {instance_name}, {config_name} (seed {BASE_SEED})"
+        plt.close(plot_run(history, title, plots_dir / f"{algorithm}_{instance_name}_{config_name}.png"))
+        fronts[name] = non_dominated(history[-1])
+    title = f"Final fronts on {instance_name}, {config_name} (seed {BASE_SEED})"
+    plt.close(plot_fronts(fronts, title, plots_dir / f"compare_{instance_name}_{config_name}.png"))
+
+    with open(RESULTS_DIR / "fronts.csv", "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["algorithm", "instance", "config", "seed", "seconds", "f1", "f2"])
+        writer.writerows(rows)
+
+    print(f"checkpoint: saved {len(first_runs) + 1} pictures to results/plots/ "
+          f"and {len(rows)} front points so far to results/fronts.csv", flush=True)
+
+
+def summarise(rows):
+    """Hypervolume of every run, scaled the same way for every algorithm on an instance; print and save a table."""
+    runs = {}  # (algorithm, instance, config, seed) -> its front and run time
+    scale = {}  # instance -> (ideal, nadir): the best and worst f1 and f2 that any run found on it
+    for algorithm, instance, config, seed, seconds, f1, f2 in rows:
+        runs.setdefault((algorithm, instance, config, seed), {"front": [], "seconds": seconds})["front"].append((f1, f2))
+        low, high = scale.get(instance, ((f1, f2), (f1, f2)))
+        scale[instance] = ((min(low[0], f1), min(low[1], f2)), (max(high[0], f1), max(high[1], f2)))
+
+    results = {}  # (algorithm, instance, config) -> [(hypervolume, trade-offs, seconds) of every run]
+    for (algorithm, instance, config, _), run in runs.items():
+        hv = hypervolume_2d(normalise(run["front"], *scale[instance]))
+        results.setdefault((algorithm, instance, config), []).append((hv, len(run["front"]), run["seconds"]))
+
+    table = []
+    for (algorithm, instance, config), values in results.items():
+        hvs = [hv for hv, _, _ in values]
+        table.append([algorithm, instance, config, len(values), mean(hvs), stdev(hvs) if len(hvs) > 1 else 0.0,
+                      max(hvs), min(hvs), mean(n for _, n, _ in values), mean(s for _, _, s in values)])
+
+    print(f"\nHypervolume (HV): each instance scaled to 0..1 between the best and worst values any run found on it, "
+          f"reference point {REFERENCE_POINT}; bigger is better.")
+    print(f"{'algorithm':<10}{'instance':<9}{'config':<7}{'runs':>5}{'HV mean':>9}{'HV std':>8}{'HV best':>9}"
+          f"{'HV worst':>9}{'trade-offs':>11}{'seconds':>9}")
+    for algorithm, instance, config, n, hv_mean, hv_std, hv_best, hv_worst, trade_offs, seconds in table:
+        print(f"{algorithm:<10}{instance:<9}{config:<7}{n:>5}{hv_mean:>9.3f}{hv_std:>8.3f}{hv_best:>9.3f}"
+              f"{hv_worst:>9.3f}{trade_offs:>11.1f}{seconds:>9.2f}")
+
+    with open(RESULTS_DIR / "summary.csv", "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["algorithm", "instance", "config", "runs", "hv_mean", "hv_std", "hv_best", "hv_worst",
+                         "mean_trade_offs", "mean_seconds"])
+        writer.writerows(table)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--algorithms", nargs="+", choices=available_algorithms(), default=["vega"],
-                        help="algorithms to run (default: vega, the only one implemented)")
+    parser.add_argument("--algorithms", nargs="+", choices=available_algorithms(), default=["vega", "nsga2"],
+                        help="algorithms to run (default: both)")
     parser.add_argument("--instances", nargs="+", choices=ALL_INSTANCES, default=ALL_INSTANCES,
                         help="instance names, e.g. cap101 cap121 (default: all six)")
     parser.add_argument("--configs", nargs="+", choices=ALL_CONFIGS, default=ALL_CONFIGS,
@@ -123,13 +158,23 @@ def main():
     # several combinations: each window closes by itself, so the next one can start
     close_windows = len(args.algorithms) * len(args.instances) * len(configs) > 1
 
-    for algorithm in args.algorithms:
-        for instance_name in args.instances:
-            instance = load_by_name(instance_name)
-            print(f"\nloading {instance_name}: {instance.m} facilities, {instance.n} customers", flush=True)
-            run_instance(algorithm, instance, configs, args.runs, rows, close_windows)
+    for instance_name in args.instances:
+        instance = load_by_name(instance_name)
+        print(f"\nloading {instance_name}: {instance.m} facilities, {instance.n} customers", flush=True)
+        for config in configs:
+            print(f"{instance.name}, {config.name}: {args.runs} runs of {' and '.join(args.algorithms)} "
+                  f"(population {config.pop_size}, {config.max_evaluations:,} evaluations each)", flush=True)
+            first_runs = {}
+            for algorithm in args.algorithms:
+                first = run_combination(algorithm, instance, config, args.runs, rows, close_windows)
+                if first:
+                    first_runs[algorithm] = first
+            if first_runs:
+                save_checkpoint(rows, instance.name, config.name, first_runs)
 
-    print(f"done: {len(rows)} front points in results/fronts.csv, pictures in results/plots/")
+    if rows:
+        summarise(rows)
+    print("\ndone: results/fronts.csv, results/summary.csv and pictures in results/plots/")
 
 
 if __name__ == "__main__":
