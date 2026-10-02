@@ -1,5 +1,5 @@
 """Entry point: run VEGA and NSGA-II at the same time on every instance, config and seed, play their first runs
-side by side in a window, save fronts and pictures to results/, and print a hypervolume table (results/summary.csv).
+together on one plot, save fronts and pictures to results/, and print a hypervolume table (results/summary.csv).
 
 Examples:
     python run_experiments.py                                                    # everything, 10 runs each
@@ -55,7 +55,7 @@ def progress_line(number, histories):
 
 
 def watch_runs(histories, title, close_when_done):
-    """Play the runs side by side in a window, with a terminal line every PRINT_EVERY generations in step."""
+    """Play the runs together on one plot, with a terminal line every PRINT_EVERY generations in step."""
     last = max(len(history) for history in histories.values()) - 1
     print(f"\n{title}\n{progress_header(histories)}")
 
@@ -67,7 +67,7 @@ def watch_runs(histories, title, close_when_done):
 
 
 def run_combination(pool, instance_name, config, algorithms, runs, rows, close_window):
-    """Start every algorithm and seed at the same time, play the first runs side by side, then collect the rest."""
+    """Start every algorithm and seed at the same time, play the first runs together, then collect the rest."""
     futures = {(algorithm, run): pool.submit(run_seed, algorithm, instance_name, config.name, BASE_SEED + run, run == 0)
                for algorithm in algorithms for run in range(runs)}
 
@@ -81,7 +81,7 @@ def run_combination(pool, instance_name, config, algorithms, runs, rows, close_w
             failed.add(algorithm)
 
     if first_runs:  # the other seeds keep running in the background while the window plays
-        title = f"{instance_name}, {config.name} (seed {BASE_SEED})"
+        title = f"{instance_name} - {config.name} (seed {BASE_SEED})"
         watch_runs(dict(first_runs.values()), title, close_window)
 
     for (algorithm, run), future in futures.items():
@@ -101,10 +101,10 @@ def save_checkpoint(rows, instance_name, config_name, first_runs):
     plots_dir.mkdir(parents=True, exist_ok=True)
     fronts = {}
     for algorithm, (name, history) in first_runs.items():
-        title = f"{name} on {instance_name}, {config_name} (seed {BASE_SEED})"
+        title = f"{name} - {instance_name} - {config_name} (seed {BASE_SEED})"
         plt.close(plot_run(history, title, plots_dir / f"{algorithm}_{instance_name}_{config_name}.png"))
         fronts[name] = non_dominated(history[-1])
-    title = f"Final fronts on {instance_name}, {config_name} (seed {BASE_SEED})"
+    title = f"{instance_name} - {config_name} (seed {BASE_SEED})"
     plt.close(plot_fronts(fronts, title, plots_dir / f"compare_{instance_name}_{config_name}.png"))
 
     with open(RESULTS_DIR / "fronts.csv", "w", newline="") as file:

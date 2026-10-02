@@ -12,18 +12,32 @@ F1_LABEL = "f1: opening cost"
 F2_LABEL = "f2: allocation cost"
 FRAME_STEP = 4  # the window shows every 4th generation (and the last one), so a run plays in a few seconds
 SECONDS_BEFORE_CLOSING = 2  # with several combinations: how long the last generation stays on screen
+STYLES = {"VEGA": ("o-", "tab:blue", 3), "NSGA-II": ("s-", "tab:orange", 2)}  # VEGA's circles drawn on top
+
+
+def draw_fronts(ax, fronts, title, populations=None):
+    """Each algorithm's trade-offs, and its population if given, on one plot with one shared scale ({name: points})."""
+    ax.clear()
+    for name, front in fronts.items():
+        line_style, color, layer = STYLES.get(name, ("^-", None, 1))
+        ax.plot([f1 for f1, _ in front], [f2 for _, f2 in front], line_style, color=color, zorder=layer,
+                markersize=9, markerfacecolor="white", markeredgewidth=1.6, linewidth=1.8,
+                label=f"{name} trade-offs ({len(front)})")  # big hollow rings
+        if populations:  # small dots on top: a dot inside a ring is a population member on the front
+            population = populations[name]
+            ax.scatter([f1 for f1, _ in population], [f2 for _, f2 in population], s=9, color=color, alpha=0.75,
+                       linewidths=0, zorder=4, label=f"{name} population ({len(population)})")
+    ax.set(title=f"{' vs '.join(fronts)} - {title}", xlabel=F1_LABEL, ylabel=F2_LABEL)
+    ax.xaxis.set_major_formatter(WITH_COMMAS)
+    ax.yaxis.set_major_formatter(WITH_COMMAS)
+    ax.grid(alpha=0.3)
+    ax.legend(loc="upper right")
 
 
 def plot_fronts(fronts, title, out_path):
-    """Every algorithm's final front on the same axes ({name: list of (f1, f2)}); saved to out_path."""
+    """Every algorithm's final front on one plot ({name: list of (f1, f2)}); saved to out_path."""
     fig, ax = plt.subplots(figsize=(8, 6))
-    for name, front in fronts.items():
-        ax.plot([f1 for f1, _ in front], [f2 for _, f2 in front], "o-", label=f"{name} ({len(front)} trade-offs)")
-    ax.set(title=title, xlabel=F1_LABEL, ylabel=F2_LABEL)
-    ax.xaxis.set_major_formatter(WITH_COMMAS)
-    ax.yaxis.set_major_formatter(WITH_COMMAS)
-    ax.grid(alpha=0.25)
-    ax.legend()
+    draw_fronts(ax, fronts, title)
     fig.tight_layout()
     fig.savefig(out_path, dpi=110)
     return fig
@@ -69,42 +83,17 @@ def plot_run(history, title, out_path):
     return fig
 
 
-def zoom_to(ax, points):
-    """Fit the axes around these (f1, f2) points, with a small margin."""
-    f1s, f2s = [f1 for f1, _ in points], [f2 for _, f2 in points]
-    f1_margin = 0.08 * (max(f1s) - min(f1s)) or 0.05 * max(f1s) or 1
-    f2_margin = 0.08 * (max(f2s) - min(f2s)) or 0.05 * max(f2s) or 1
-    ax.set_xlim(min(f1s) - f1_margin, max(f1s) + f1_margin)
-    ax.set_ylim(min(f2s) - f2_margin, max(f2s) + f2_margin)
-
-
 def animate_runs(histories, title, on_frame=None, close_when_done=False, milliseconds_per_frame=120):
-    """Play runs side by side ({name: history}), one generation per frame; on_frame(number) runs with every frame."""
+    """Play runs ({name: history}) on one plot, one generation per frame; on_frame(number) runs with every frame."""
     last = max(len(history) for history in histories.values()) - 1
-    fig, axes = plt.subplots(1, len(histories), figsize=(7 * len(histories), 6), squeeze=False)
-
-    panels = {}  # name -> (axes, trade-off line, population dots)
-    for ax, name in zip(axes[0], histories):
-        ax.set(xlabel=F1_LABEL, ylabel=F2_LABEL)
-        ax.xaxis.set_major_formatter(WITH_COMMAS)
-        ax.yaxis.set_major_formatter(WITH_COMMAS)
-        ax.grid(alpha=0.25)
-        # trade-offs as hollow rings drawn under the dots, so no part of the population is hidden
-        (line,) = ax.plot([], [], "o-", color="red", markerfacecolor="none", markersize=10, zorder=2,
-                          label="trade-offs")
-        dots = ax.scatter([], [], alpha=0.6, zorder=3, label="population")
-        ax.legend(loc="upper right")
-        panels[name] = (ax, line, dots)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    fig.canvas.manager.set_window_title(f"{' vs '.join(histories)} - {title}")
+    fig.subplots_adjust(left=0.15, right=0.96, top=0.93, bottom=0.1)  # fixed margins, so the plot does not jump
 
     def draw(number):
-        for name, (ax, line, dots) in panels.items():
-            generation = histories[name][min(number, len(histories[name]) - 1)]
-            front = non_dominated(generation)
-            dots.set_offsets(generation)
-            line.set_data([f1 for f1, _ in front], [f2 for _, f2 in front])
-            zoom_to(ax, generation)  # each panel follows its own population
-            ax.set_title(f"{name}: {len(generation)} solutions, {len(front)} trade-offs")
-        fig.suptitle(f"{title}, generation {number} of {last} (each panel has its own scale)")
+        generations = {name: history[min(number, len(history) - 1)] for name, history in histories.items()}
+        fronts = {name: non_dominated(generation) for name, generation in generations.items()}
+        draw_fronts(ax, fronts, f"{title}, generation {number} of {last}", generations)
 
     def window_open():
         return plt.fignum_exists(fig.number)  # False once the window has been closed
