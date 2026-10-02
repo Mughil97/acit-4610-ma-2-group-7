@@ -1,4 +1,4 @@
-"""NSGA-II (Deb et al. 2002), from Mughil's nsga_2_integer.py, on the shared loop used by VEGA."""
+"""NSGA-II (Deb et al. 2002): selection ported from Mughil's nsga_2_integer.py, on the shared loop used by VEGA."""
 
 from app.algorithms.base import MOEA
 

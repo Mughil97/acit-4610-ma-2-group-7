@@ -4,6 +4,7 @@ File layout: "m n", then m lines "capacity fixed_cost", then per customer its de
 """
 
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 
 from app.config import DATA_DIR
@@ -24,6 +25,16 @@ class CFLPInstance:
     @property
     def n(self):
         return len(self.demand)
+
+    @cached_property  # worked out once per instance, for the greedy decoder
+    def customers_by_demand(self):
+        """Customers from the biggest demand to the smallest (a tie: the lower number first)."""
+        return tuple(sorted(range(self.n), key=lambda j: -self.demand[j]))
+
+    @cached_property
+    def facilities_by_cost(self):
+        """facilities_by_cost[j]: the facilities from the cheapest to the dearest for customer j."""
+        return tuple(tuple(sorted(range(self.m), key=lambda i, j=j: self.alloc_cost[i][j])) for j in range(self.n))
 
 
 def load_instance(path):

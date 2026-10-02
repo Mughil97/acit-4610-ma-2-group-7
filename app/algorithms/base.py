@@ -41,11 +41,12 @@ class MOEA:
 
     def reproduce(self, mating_pool):
         """Pair consecutive parents: crossover, mutation, repair."""
+        mutation_prob = self.config.mutation_flips / self.instance.m  # per facility
         children = []
         for k in range(0, len(mating_pool), 2):
             child1, child2 = crossover(mating_pool[k], mating_pool[k + 1], self.config.crossover_prob, self.rng)
             for child in (child1, child2):
-                child = mutate(child, self.config.mutation_prob, self.rng)
+                child = mutate(child, mutation_prob, self.rng)
                 children.append(repair(child, self.instance, self.rng))
         return children
 

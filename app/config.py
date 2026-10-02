@@ -1,7 +1,7 @@
 """Experiment settings shared by both MOEAs.
 
 Within one configuration NSGA-II and VEGA must use identical values so the
-comparison is fair. Values below are provisional and will be tuned.
+comparison is fair. C1, C2 and C3 use the values of Sofia's P1, P2 and P3.
 """
 
 from dataclasses import dataclass
@@ -28,12 +28,12 @@ class ExperimentConfig:
     pop_size: int
     max_evaluations: int
     crossover_prob: float
-    mutation_prob: float
+    mutation_flips: int  # facilities flipped per child on average: each flips with probability mutation_flips / m
     tournament_size: int = 2
 
 
 CONFIGS = [
-    ExperimentConfig("C1", pop_size=50, max_evaluations=10_000, crossover_prob=0.9, mutation_prob=0.05),
-    ExperimentConfig("C2", pop_size=100, max_evaluations=20_000, crossover_prob=0.9, mutation_prob=0.02),
-    ExperimentConfig("C3", pop_size=200, max_evaluations=40_000, crossover_prob=0.8, mutation_prob=0.01),
+    ExperimentConfig("C1", pop_size=50, max_evaluations=10_000, crossover_prob=0.8, mutation_flips=1),
+    ExperimentConfig("C2", pop_size=100, max_evaluations=30_000, crossover_prob=0.9, mutation_flips=1),
+    ExperimentConfig("C3", pop_size=200, max_evaluations=100_000, crossover_prob=0.95, mutation_flips=2),
 ]
