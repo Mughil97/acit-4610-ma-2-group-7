@@ -1,4 +1,4 @@
-"""Plots of one algorithm run."""
+"""Plots of algorithm runs."""
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -7,6 +7,23 @@ from matplotlib.ticker import FuncFormatter, MaxNLocator
 from app.utils.pareto import non_dominated
 
 WITH_COMMAS = FuncFormatter(lambda value, _: f"{value:,.0f}")
+F1_LABEL = "f1: opening cost"
+F2_LABEL = "f2: allocation cost"
+
+
+def plot_fronts(fronts, title, out_path):
+    """Every algorithm's final front on the same axes ({name: list of (f1, f2)}); saved to out_path."""
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for name, front in fronts.items():
+        ax.plot([f1 for f1, _ in front], [f2 for _, f2 in front], "o-", label=f"{name} ({len(front)} trade-offs)")
+    ax.set(title=title, xlabel=F1_LABEL, ylabel=F2_LABEL)
+    ax.xaxis.set_major_formatter(WITH_COMMAS)
+    ax.yaxis.set_major_formatter(WITH_COMMAS)
+    ax.grid(alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=110)
+    return fig
 
 
 def plot_run(history, title, out_path):
@@ -21,7 +38,7 @@ def plot_run(history, title, out_path):
     ax1.scatter([f1 for f1, _ in last], [f2 for _, f2 in last], alpha=0.6, label="end: last generation")
     ax1.plot([f1 for f1, _ in front], [f2 for _, f2 in front], "o-", color="red",
              label=f"final trade-offs ({len(front)})")
-    ax1.set(title="Where the population started and ended", xlabel="f1: opening cost", ylabel="f2: allocation cost")
+    ax1.set(title="Where the population started and ended", xlabel=F1_LABEL, ylabel=F2_LABEL)
     ax1.xaxis.set_major_locator(MaxNLocator(5))
     ax1.xaxis.set_major_formatter(WITH_COMMAS)
     ax1.yaxis.set_major_formatter(WITH_COMMAS)
@@ -58,7 +75,7 @@ def animate_run(history, title, on_frame=None, close_when_done=False, millisecon
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.set_xlim(min(all_f1) * 0.95, max(all_f1) * 1.05)  # fixed axes, so the movement is visible
     ax.set_ylim(min(all_f2) * 0.95, max(all_f2) * 1.05)
-    ax.set(xlabel="f1: opening cost", ylabel="f2: allocation cost")
+    ax.set(xlabel=F1_LABEL, ylabel=F2_LABEL)
     ax.xaxis.set_major_formatter(WITH_COMMAS)
     ax.yaxis.set_major_formatter(WITH_COMMAS)
     ax.grid(alpha=0.25)
