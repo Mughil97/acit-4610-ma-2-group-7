@@ -3,13 +3,14 @@
 from app.problem.repair import decode
 
 
-def evaluate(individual, instance):
-    f1 = 0.0
-    for facility in decode(individual):  # fixed cost of every open facility
-        f1 += instance.fixed_cost[facility]
+def evaluate_binary(individual, instance):
+    f1 = sum(instance.fixed_cost[i] for i in range(instance.m) if individual[i])  # every open facility
+    f2 = sum(instance.alloc_cost[facility][customer]  # each customer's cost, not multiplied by demand
+             for customer, facility in enumerate(decode(individual, instance)))
+    return f1, f2
 
-    f2 = 0.0
-    for customer, facility in enumerate(individual):  # not multiplied by demand
-        f2 += instance.alloc_cost[facility][customer]
 
+def evaluate_integer(individual, instance):
+    f1 = sum(instance.fixed_cost[i] for i in set(individual))  # a facility is open when it serves a customer
+    f2 = sum(instance.alloc_cost[facility][customer] for customer, facility in enumerate(individual))
     return f1, f2

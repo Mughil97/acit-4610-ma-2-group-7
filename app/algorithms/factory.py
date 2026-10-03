@@ -16,9 +16,10 @@ def available_algorithms() -> list[str]:
     return list(_REGISTRY)
 
 
-def create_algorithm(name: str, instance: CFLPInstance, config: ExperimentConfig, seed: int) -> MOEA:
+def create_algorithm(name: str, instance: CFLPInstance, config: ExperimentConfig, seed: int,
+                     representation: str = "binary") -> MOEA:
     try:
         cls = _REGISTRY[name.lower()]
     except KeyError:
         raise ValueError(f"Unknown algorithm {name!r}; choose from {available_algorithms()}") from None
-    return cls(instance, config, seed)
+    return cls(instance, config, seed, representation)
