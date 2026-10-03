@@ -1,4 +1,5 @@
 # ACIT4610 Project 2  - Group 7
+
 # Multi-Objective Evolutionary Optimization for the Capacitated Facility Location Problem (CFLP)
 
 ## Project Overview
@@ -21,7 +22,7 @@ This project implements and compares two evolutionary optimization approaches:
 
 The algorithms are evaluated using benchmark CFLP instances from the OR-Library.
 
-# Problem Description
+## Problem Description
 
 The Capacitated Facility Location Problem consists of:
 
@@ -40,7 +41,7 @@ A feasible solution must satisfy:
 
 The challenge is balancing the two conflicting objectives:
 
-## Objective 1: Facility Opening Cost
+### Objective 1: Facility Opening Cost
 
 Minimize:
 
@@ -53,9 +54,7 @@ where:
 - \(F_i\) is the fixed opening cost of facility \(i\)
 - \(y_i\) indicates whether facility \(i\) is opened
 
----
-
-## Objective 2: Customer Allocation Cost
+### Objective 2: Customer Allocation Cost
 
 Minimize:
 
@@ -70,9 +69,9 @@ where:
 
 Both objectives are minimized simultaneously.
 
-# Algorithms
+## Algorithms
 
-## VEGA (Vector Evaluated Genetic Algorithm)
+### VEGA (Vector Evaluated Genetic Algorithm)
 
 VEGA is a multi-objective evolutionary algorithm that separates selection according to individual objectives.
 
@@ -88,7 +87,7 @@ Population initialization\
 → Replacement\
 → Repeat
 
-## NSGA-II (Non-dominated Sorting Genetic Algorithm II)
+### NSGA-II (Non-dominated Sorting Genetic Algorithm II)
 
 NSGA-II is a Pareto-based evolutionary algorithm designed to maintain both convergence and diversity.
 
@@ -112,13 +111,12 @@ Population initialization\
 
 Both algorithms are implemented under the same experimental framework to allow a fair comparison.
 
-
-# Solution Representation
+## Solution Representation
 
 The project uses a chromosome-based representation for evolutionary optimization.
 
-Each chromosome represents a candidate solution for the **Capacitated Facility Location Problem (CFLP)**. 
-The evolutionary algorithms operate on chromosomes, while repair and decoding procedures 
+Each chromosome represents a candidate solution for the **Capacitated Facility Location Problem (CFLP)**.
+The evolutionary algorithms operate on chromosomes, while repair and decoding procedures
 transform these chromosomes into feasible CFLP solutions before objective evaluation.
 
 The overall solution pipeline is:
@@ -135,7 +133,7 @@ Objective Evaluation
 Evolutionary Selection
 ```
 
-## Binary Chromosome Representation
+### Binary Chromosome Representation
 
 The project uses a binary chromosome representation where each gene corresponds to one candidate facility.
 
@@ -165,9 +163,9 @@ Facility 5 → Open
 
 The chromosome represents only facility opening decisions. Customer-to-facility assignments are generated during the decoding step.
 
-## Repair and Decoding
+### Repair and Decoding
 
-Evolutionary operators such as crossover and mutation may create infeasible solutions. 
+Evolutionary operators such as crossover and mutation may create infeasible solutions.
 Therefore, a repair procedure is applied before objective evaluation.
 
 The repair and decoding process ensures that:
@@ -198,19 +196,18 @@ After decoding, the solution can be evaluated using the two objective functions:
 The same chromosome representation, repair mechanism, and objective evaluation procedure are used by both VEGA 
 and NSGA-II to ensure a fair algorithm comparison.
 
-
-# Dataset
+## Dataset
 
 The project uses benchmark Capacitated Facility Location Problem instances from the OR-Library.
 
 The evaluated instances are:
 
--   cap61
--   cap62
--   cap101
--   cap102
--   cap121
--   cap122
+- cap61
+- cap62
+- cap101
+- cap102
+- cap121
+- cap122
 
 Each instance contains:
 
@@ -221,15 +218,14 @@ Each instance contains:
 - Customer demands
 - Customer-facility allocation costs
 
-
-# Experimental Setup
+## Experimental Setup
 
 The algorithms are evaluated using multiple configurations with different evaluation budgets.
 
-## Configurations
+### Configurations
 
 | Configuration | Maximum Evaluations |
-|---|---:|
+| --- | ---: |
 | C1 | 10,000 |
 | C2 | 20,000 |
 | C3 | 40,000 |
@@ -238,8 +234,7 @@ Each configuration is evaluated using multiple independent runs to account for t
 
 **The experiments are performed on small, medium, and large CFLP benchmark instances to analyse algorithm behavior under different problem scales.**
 
-
-# Evaluation Metrics
+## Evaluation Metrics
 
 Algorithms are compared using:
 
@@ -248,14 +243,13 @@ Algorithms are compared using:
 - Execution time
 - Pareto-front visualization
 
-## Hypervolume (HV)
+### Hypervolume (HV)
 
 Hypervolume measures the quality of the obtained Pareto front by considering both convergence and diversity.
 
 A higher hypervolume indicates that the obtained solutions dominate a larger portion of the objective space relative to a reference point.
 
-
-# Repository Structure
+## Repository Structure
 
 ```text
 ACIT4610_Project2/
@@ -291,9 +285,9 @@ ACIT4610_Project2/
 └── README.md
 ```
 
-# Installation
+## Installation
 
-## 1. Clone the repository
+### 1. Clone the repository
 
 Clone the GitHub repository:
 
@@ -307,7 +301,7 @@ Navigate to the project folder:
 cd acit-4610-ma-2-group-7
 ```
 
-## 2. Create and activate a virtual environment (recommended)
+### 2. Create and activate a virtual environment (recommended)
 
 Create a virtual environment:
 
@@ -329,7 +323,7 @@ source .venv/bin/activate
 .venv\Scripts\activate
 ```
 
-## 3. Install dependencies
+### 3. Install dependencies
 
 Install the required Python packages:
 
@@ -337,7 +331,7 @@ Install the required Python packages:
 pip install -r requirements.txt
 ```
 
-# Running Tests
+## Running Tests
 
 Run the test suite using:
 
@@ -354,7 +348,7 @@ The tests verify important project components, including:
 
 A successful test run confirms that the core components are working correctly before running experiments.
 
-# Running Experiments
+## Running Experiments
 
 Run the complete experiment setup:
 
@@ -371,71 +365,20 @@ The generated results include:
 - Runtime statistics
 - Pareto front visualizations
 
-# Academic Integrity Boundary
+## AI Use Disclosure
 
-This repository represents the group's own implementation work for
-ACIT4610 Project 2.
+During the development of this project, generative AI tools, including ChatGPT (OpenAI) and Claude (Anthropic), were used as supporting tools for permitted coding-related activities.
 
-The project follows academic integrity principles by clearly distinguishing between:
+The tools were used for:
 
-## Course Materials
+Technical and coding clarification: Clarifying programming concepts, algorithm behaviour, and implementation requirements.
 
-The project uses ACIT4610 lectures, laboratory materials,
-and official assignment requirements for understanding concepts and 
-implementation expectations.
+Project scaffolding: The project's file structure and code scaffolding using factory pattern.
 
-## External References
+Data visualisation: Assisting with Python/Matplotlib code used to generate plots and visualise experimental results.
 
-External references are used only for understanding standard algorithms,
-programming documentation, and clarification of implementation details.
+Code review and refactoring: Assisting with debugging and refactoring code for better performance, readability, and structure.
 
-## Original Work
+All algorithmic decisions, parameter choices, experiments, outputs, and final code were reviewed and verified by the group.
 
-The group developed the project-specific implementation, including:
-
--   CFLP problem handling
--   Solution representation
--   Repair and decoding
--   Objective evaluation
--   Algorithm integration
--   Experimental framework
--   Result analysis
-
-The repository does not contain copied solutions from previous
-submissions or external assignment solutions.
-
-
-# Team Development Workflow
-
-The project uses:
-
--   Feature branches
--   Pull requests
--   Code review
--   Meaningful commit messages
--   Documentation of design decisions
-
-
-# Authors
-
-ACIT4610 Project Group 7
-
-# License
-
-This repository is created for educational purposes as part of the ACIT4610 Evolutionary
-Artificial Intelligence and Robotics course.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+The final written report was produced by the group members in their own words in accordance with the assignment's AI-use requirements.
