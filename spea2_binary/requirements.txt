@@ -1,0 +1,2 @@
+# Core algorithms, CSV summaries, SVG plots and unittest use standard Python only.
+# No pip dependencies required.
