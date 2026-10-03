@@ -2,6 +2,8 @@
 
 import time
 
+import matplotlib
+matplotlib.use("Agg")  # save plots without Tkinter GUI
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 
