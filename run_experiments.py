@@ -6,7 +6,7 @@ Examples:
     python run_experiments.py --instances cap121 --configs C3 --runs 1           # one run of each algorithm
     python run_experiments.py --representation integer                           # saved in results/integer/
 
-Statistical tests will be added here later.
+The runner also writes per-run metrics and paired Wilcoxon HV comparisons.
 """
 
 import argparse
@@ -15,6 +15,8 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from statistics import mean, stdev
 
+import matplotlib
+matplotlib.use("Agg")  # headless backend: safe with ProcessPoolExecutor on Windows
 import matplotlib.pyplot as plt
 
 from app.algorithms import available_algorithms, create_algorithm
@@ -22,7 +24,8 @@ from app.config import BASE_SEED, CONFIGS, INSTANCES, N_RUNS, RESULTS_DIR
 from app.problem.loader import load_by_name
 from app.utils.metrics import REFERENCE_POINT, hypervolume_2d, normalise
 from app.utils.pareto import non_dominated
-from app.utils.plotting import animate_runs, plot_fronts, plot_run
+from app.utils.plotting import plot_fronts, plot_run
+from app.utils.statistics import paired_wilcoxon
 
 ALL_INSTANCES = [name for names in INSTANCES.values() for name in names]
 ALL_CONFIGS = [config.name for config in CONFIGS]
@@ -56,15 +59,18 @@ def progress_line(number, histories):
 
 
 def watch_runs(histories, title, close_when_done):
-    """Play the runs together on one plot, with a terminal line every PRINT_EVERY generations in step."""
+    """Print synchronized progress for the first runs without opening GUI windows.
+
+    Final figures are still saved to results/plots/. Avoiding a Tk GUI here makes the
+    ProcessPoolExecutor run reliable on Windows and does not change either MOEA.
+    """
     last = max(len(history) for history in histories.values()) - 1
     print(f"\n{title}\n{progress_header(histories)}")
-
-    def on_frame(number):
-        if number % PRINT_EVERY == 0 or number == last:
-            print(progress_line(number, histories), flush=True)
-
-    animate_runs(histories, title, on_frame, close_when_done)  # returns when the window is closed
+    numbers = list(range(0, last + 1, PRINT_EVERY))
+    if not numbers or numbers[-1] != last:
+        numbers.append(last)
+    for number in numbers:
+        print(progress_line(number, histories), flush=True)
 
 
 def run_combination(pool, instance_name, config, algorithms, runs, rows, close_window, representation):
@@ -126,27 +132,35 @@ def save_checkpoint(rows, instance_name, config_name, first_runs, results_dir):
 
 
 def summarise(rows, results_dir):
-    """Hypervolume of every run, scaled the same way for every algorithm on an instance; print and save a table."""
+    """Save per-run metrics, aggregate summaries, and paired HV statistical comparisons."""
     runs = {}  # (algorithm, instance, config, seed) -> its front and run time
-    scale = {}  # instance -> (ideal, nadir): the best and worst f1 and f2 that any run found on it
+    scale = {}  # instance -> (ideal, nadir): shared empirical scaling across all included runs/configs/algorithms
     for algorithm, instance, config, seed, seconds, f1, f2 in rows:
         runs.setdefault((algorithm, instance, config, seed), {"front": [], "seconds": seconds})["front"].append((f1, f2))
         low, high = scale.get(instance, ((f1, f2), (f1, f2)))
         scale[instance] = ((min(low[0], f1), min(low[1], f2)), (max(high[0], f1), max(high[1], f2)))
 
-    results = {}  # (algorithm, instance, config) -> [(hypervolume, trade-offs, seconds) of every run]
-    for (algorithm, instance, config, _), run in runs.items():
+    per_run = []
+    grouped = {}
+    for (algorithm, instance, config, seed), run in sorted(runs.items()):
         hv = hypervolume_2d(normalise(run["front"], *scale[instance]))
-        results.setdefault((algorithm, instance, config), []).append((hv, len(run["front"]), run["seconds"]))
+        record = [algorithm, instance, config, seed, hv, len(run["front"]), run["seconds"]]
+        per_run.append(record)
+        grouped.setdefault((algorithm, instance, config), []).append((seed, hv, len(run["front"]), run["seconds"]))
+
+    with open(results_dir / "run_metrics.csv", "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["algorithm", "instance", "config", "seed", "hypervolume", "non_dominated", "seconds"])
+        writer.writerows(per_run)
 
     table = []
-    for (algorithm, instance, config), values in results.items():
-        hvs = [hv for hv, _, _ in values]
+    for (algorithm, instance, config), values in sorted(grouped.items()):
+        hvs = [hv for _, hv, _, _ in values]
         table.append([algorithm, instance, config, len(values), mean(hvs), stdev(hvs) if len(hvs) > 1 else 0.0,
-                      max(hvs), min(hvs), mean(n for _, n, _ in values), mean(s for _, _, s in values)])
+                      max(hvs), min(hvs), mean(n for _, _, n, _ in values), mean(sec for _, _, _, sec in values)])
 
-    print(f"\nHypervolume (HV): each instance scaled to 0..1 between the best and worst values any run found on it, "
-          f"reference point {REFERENCE_POINT}; bigger is better.")
+    print(f"\nHypervolume (HV): each instance scaled to 0..1 between the best and worst values any included run found "
+          f"on it, reference point {REFERENCE_POINT}; bigger is better.")
     print(f"{'algorithm':<10}{'instance':<9}{'config':<7}{'runs':>5}{'HV mean':>9}{'HV std':>8}{'HV best':>9}"
           f"{'HV worst':>9}{'trade-offs':>11}{'seconds':>9}")
     for algorithm, instance, config, n, hv_mean, hv_std, hv_best, hv_worst, trade_offs, seconds in table:
@@ -158,6 +172,32 @@ def summarise(rows, results_dir):
         writer.writerow(["algorithm", "instance", "config", "runs", "hv_mean", "hv_std", "hv_best", "hv_worst",
                          "mean_trade_offs", "mean_seconds"])
         writer.writerows(table)
+
+    # Paired by seed because both algorithms use the same seeds and common experimental conditions.
+    stat_rows = []
+    algorithms = sorted({key[0] for key in grouped})
+    if len(algorithms) == 2:
+        a, b = algorithms
+        combinations = sorted({(key[1], key[2]) for key in grouped})
+        for instance, config in combinations:
+            va = {seed: hv for seed, hv, _, _ in grouped.get((a, instance, config), [])}
+            vb = {seed: hv for seed, hv, _, _ in grouped.get((b, instance, config), [])}
+            common = sorted(set(va) & set(vb))
+            if len(common) >= 2:
+                statistic, p_value = paired_wilcoxon([va[s] for s in common], [vb[s] for s in common])
+                stat_rows.append([instance, config, a, b, len(common), statistic, p_value])
+
+    with open(results_dir / "statistics.csv", "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["instance", "config", "algorithm_a", "algorithm_b", "paired_runs",
+                         "wilcoxon_statistic", "p_value_two_sided"])
+        writer.writerows(stat_rows)
+
+    with open(results_dir / "normalization.csv", "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["instance", "ideal_f1", "ideal_f2", "nadir_f1", "nadir_f2", "reference_f1", "reference_f2"])
+        for instance, (ideal, nadir) in sorted(scale.items()):
+            writer.writerow([instance, ideal[0], ideal[1], nadir[0], nadir[1], *REFERENCE_POINT])
 
 
 def main():
@@ -197,7 +237,8 @@ def main():
     if rows:
         summarise(rows, results_dir)
     folder = results_dir.relative_to(RESULTS_DIR.parent)
-    print(f"\ndone: {folder}/fronts.csv, {folder}/summary.csv and pictures in {folder}/plots/")
+    print(f"\ndone: {folder}/fronts.csv, {folder}/run_metrics.csv, {folder}/summary.csv, "
+          f"{folder}/statistics.csv, {folder}/normalization.csv and pictures in {folder}/plots/")
 
 
 if __name__ == "__main__":

@@ -61,27 +61,30 @@ class NSGA2(MOEA):
         combined_objectives = objectives + offspring_objectives
         size = self.config.pop_size
 
-        # leave out exact copies while there are enough different solutions, so copies can not take over
-        unique, copies, seen = [], [], set()
-        for i, individual in enumerate(combined):
-            if tuple(individual) in seen:
-                copies.append(i)
+        fronts, _ = non_dominated_sort(combined_objectives)
+        distances = crowding_distances(combined_objectives, fronts)
+        
+        chosen = []
+        
+        for front in fronts:
+            room = size - len(chosen)
+        
+            if len(front) <= room:
+                # Whole front fits
+                chosen.extend(front)
             else:
-                seen.add(tuple(individual))
-                unique.append(i)
-        if len(unique) <= size:
-            chosen = unique + copies[:size - len(unique)]
-        else:
-            candidate_objectives = [combined_objectives[i] for i in unique]
-            fronts, _ = non_dominated_sort(candidate_objectives)
-            distances = crowding_distances(candidate_objectives, fronts)
-            chosen = []
-            for front in fronts:
-                room = size - len(chosen)
-                if len(front) > room:
-                    front = sorted(front, key=lambda i: distances[i], reverse=True)[:room]
-                chosen.extend(unique[i] for i in front)
-                if len(chosen) == size:
-                    break
-
-        return [combined[i] for i in chosen], [combined_objectives[i] for i in chosen]
+                # Only part of this front fits.
+                # Keep individuals with the largest crowding distance.
+                front = sorted(
+                    front,
+                    key=lambda i: distances[i],
+                    reverse=True,
+                )[:room]
+        
+                chosen.extend(front)
+                break
+        
+        return (
+            [combined[i] for i in chosen],
+            [combined_objectives[i] for i in chosen],
+        )
