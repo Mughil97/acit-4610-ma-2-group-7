@@ -3,7 +3,7 @@ Report-ready visualisations for ACIT4610 Assignment 2.
 
 Place this file in the project root, beside run_experiments.py, then run:
 
-    python generate_visuals_improved.py
+    python generate_visuals.py
 
 Required inputs:
     results/run_metrics.csv
