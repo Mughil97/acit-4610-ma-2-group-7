@@ -371,7 +371,7 @@ acit-4610-ma-2-group-7/
 │   ├── plots/
 │   └── visuals_improved/
 │
-├── generate_visuals_improved.py
+├── generate_visuals.py
 ├── run_experiments.py
 ├── requirements.txt
 └── README.md
